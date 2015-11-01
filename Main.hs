@@ -1,5 +1,11 @@
 import UI.HSCurses.Curses
 import CommanderGeneral
+import System.Directory
+
+-- TODO LIST
+-- Selecting
+-- Figure out multiple windows
+-- Colors
 
 loop :: Window -> IO()
 loop w = do
@@ -30,10 +36,39 @@ loop w = do
             wAddStr w (ch:[])
             loop w
 
+printDirectoryList :: Window -> [FilePath] -> IO()
+printDirectoryList _ [] = return()
+printDirectoryList w (p:ps) = do
+    (y,x) <- getYX w
+    mvWAddStr w (y + 1) 0 p
+    printDirectoryList w ps
+
+display :: Window -> IO()
+display w = do
+    (y,_) <- scrSize
+    wMove w 0 0 
+    dir <- getCurrentDirectory
+    wAddStr w dir
+    wMove w 1 0
+    list <- getDirectoryList dir
+    let sortedList = sortDirectoryList list
+        viewableList = take (y - 2) sortedList
+    printDirectoryList w viewableList
+    update
+    refresh
+    wclear w
+    c <- getCh
+    case c of 
+        KeyChar 'q' -> return ()
+        KeyChar 'h' -> do
+            cd ".."
+            display w
+        KeyChar _   -> display w
+
 main = do
     initCurses
     echo False
     w <- initScr
     wMove w 20 20 
-    loop w
+    display w
     endWin

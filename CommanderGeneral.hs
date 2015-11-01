@@ -1,17 +1,16 @@
 module CommanderGeneral
-( commandEq
-  , prompt
-  , ls
+(   ls
   , cd
   , getDirectoryList
+  , sortDirectoryList
 ) where
 
-import System.IO
-import System.Directory
 import Control.Monad
+import System.Directory
 import System.Exit
+import System.IO
 import System.Process
-
+import Data.Char
 
 data Command = PROMPT|EXIT deriving (Eq)
 
@@ -35,7 +34,7 @@ cd "" = do
     home <- getHomeDirectory
     setCurrentDirectory home
     return()
-cd (d:d1:ds) 
+cd (d1:ds) 
     | d1 == '/' = do
         setCurrentDirectory (d1:ds)
         return ()
@@ -47,6 +46,27 @@ cd (d:d1:ds)
         path <- getCurrentDirectory
         setCurrentDirectory $ path ++ "/" ++ (d1:ds)
         return ()
+
+removeCommons :: (Eq a) => [a] -> [a] -> [a]
+removeCommons [] _ = []
+removeCommons l [] = l
+removeCommons (x:xs) (ys) =
+    if x `elem` ys then removeCommons xs ys
+    else x:(removeCommons xs ys)
+
+sortDirectoryList :: [FilePath] -> [FilePath]
+sortDirectoryList [] = []
+sortDirectoryList list = 
+    let dirs    = sort $ filter (elem '/') list
+        files   = sort $ removeCommons list dirs
+        in dirs ++ files
+        where
+            sort [] = []
+            sort (x:xs) = 
+                let smaller = sort $ filter (< x) xs
+                    greater = sort $ removeCommons xs smaller
+                    in smaller ++ [x] ++ greater
+
 
 getDirectoryList :: FilePath -> IO [FilePath]
 getDirectoryList path = do
