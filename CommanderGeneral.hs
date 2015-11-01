@@ -3,6 +3,7 @@ module CommanderGeneral
   , cd
   , getDirectoryList
   , sortDirectoryList
+  , removeCommons
 ) where
 
 import Control.Monad

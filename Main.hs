@@ -1,50 +1,69 @@
 import UI.HSCurses.Curses
+import UI.HSCurses.CursesHelper
 import CommanderGeneral
 import System.Directory
 
 -- TODO LIST
--- Selecting
 -- Figure out multiple windows
--- Colors
+-- Optimization
+-- Scrolling
+-- Opening FILES
 
-loop :: Window -> IO()
-loop w = do
-    (y,x) <- getYX w
-    wMove w 10 10
-    wAddStr w "Hello World"
-    wMove w y x
-    update
-    refresh
-    c <- getCh
-    (y',x') <- getYX w
-    case c of
-        KeyChar 'q' -> return ()
-        KeyChar 'Q' -> return ()
-        KeyChar 'h' -> do
-            wMove w y' (x' - 1)
-            loop w
-        KeyChar 'j' -> do
-            wMove w (y' + 1) x'
-            loop w 
-        KeyChar 'k' -> do
-            wMove w (y' - 1) x' 
-            loop w
-        KeyChar 'l' -> do
-            wMove w y' (x' + 1)
-            loop w
-        KeyChar ch -> do
-            wAddStr w (ch:[])
-            loop w
+-- ATTRIBUTES
+selected = convertAttributes [Bold]
+folder = convertAttributes [Bold]
 
-printDirectoryList :: Window -> [FilePath] -> IO()
-printDirectoryList _ [] = return()
-printDirectoryList w (p:ps) = do
+--COLORS
+initColors = do
+    initPair (Pair 1) (Color 60) black
+    initPair (Pair 2) blue black
+    initPair (Pair 3) (Color 235) black
+    initPair (Pair 4) (Color 220) black
+
+color60 = Pair 1
+colorBlue = Pair 2
+color235 = Pair 3
+colorYellow = Pair 4
+
+printUnselected :: Window -> [FilePath] -> IO()
+printUnselected  _ [] = return()
+printUnselected w (p:ps) = do
     (y,x) <- getYX w
+    if last p == '/' then wAttrSet w (selected, colorBlue) else wAttrSet w (attr0, (Pair 0))
     mvWAddStr w (y + 1) 0 p
-    printDirectoryList w ps
+    wAttrSet w (attr0, (Pair 0))
+    printUnselected w ps
 
-display :: Window -> IO()
-display w = do
+printSelected :: Window -> FilePath -> IO()
+printSelected w fp = do
+    (y,_) <- getYX w
+    wAttrSet w (selected, colorYellow) 
+    mvWAddStr w (y + 1) 0 fp
+    wAttrSet w (attr0, (Pair 0))
+    return()
+
+printDirectoryList :: Window -> [FilePath] -> Int -> IO()
+printDirectoryList _ [] _ = return()
+printDirectoryList w pps index = do
+    -- Extract selected item from list
+    let reg1 = take index pps       --Set of items before the selected item 
+        sel  = pps !! index         --Selected item 
+        reg2 = drop (index + 1) pps --Set of items after the selected item
+    printUnselected w reg1 
+    printSelected w sel
+    printUnselected w reg2
+
+openFile :: [FilePath] -> Int -> IO Int
+openFile [] _ = return 0
+openFile list index = do
+    if (last (list !! index) == '/') then do
+        dir <- getCurrentDirectory
+        cd (init (list !! index))
+        return 0
+    else return index
+
+display :: Window -> Int -> IO()
+display w index = do
     (y,_) <- scrSize
     wMove w 0 0 
     dir <- getCurrentDirectory
@@ -53,7 +72,7 @@ display w = do
     list <- getDirectoryList dir
     let sortedList = sortDirectoryList list
         viewableList = take (y - 2) sortedList
-    printDirectoryList w viewableList
+    printDirectoryList w viewableList index
     update
     refresh
     wclear w
@@ -62,13 +81,20 @@ display w = do
         KeyChar 'q' -> return ()
         KeyChar 'h' -> do
             cd ".."
-            display w
-        KeyChar _   -> display w
+            display w 0
+        KeyChar 'j' -> if index < ((length viewableList) - 1) then display w (index + 1) else display w index
+        KeyChar 'k' -> if index > 0 then display w (index - 1) else display w index
+        KeyChar 'l' -> do 
+            index <- openFile viewableList index
+            display w index
+        KeyChar _   -> display w index
 
 main = do
     initCurses
+    initColors
+    cursSet CursorInvisible
     echo False
     w <- initScr
     wMove w 20 20 
-    display w
+    display w 0
     endWin
