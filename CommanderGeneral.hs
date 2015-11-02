@@ -76,7 +76,6 @@ getDirectoryList path = do
     let list = zipWith (\dir file -> if dir then file ++ "/" else file) bools contents
     return list
 
-
 end :: IO()
 end = do
     cmdLine "/" EXIT
