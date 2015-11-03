@@ -2,16 +2,21 @@ import UI.HSCurses.Curses
 import UI.HSCurses.CursesHelper
 import CommanderGeneral
 import System.Directory
+import System.Process
+import qualified Dispatch as Dispatch
 
 -- TODO LIST
--- Scrolling
--- Opening FILES
+-- Opening files in terminal
+-- Finding installed programs for opening files
 -- Searching
 -- mv, cp, rm
 -- Figure out multiple windows
--- Test symlinks
--- Fix performance in color-unfriendly terminals
+-- Adding more filetypes and default programs
 -- Optimization
+
+-- ERRORS TO FIX
+-- Fix index shift after opening file
+-- Fix performance in color-unfriendly terminals
 
 -- ATTRIBUTES
 selected = convertAttributes [Reverse,Bold]
@@ -85,14 +90,22 @@ printDirectoryList' w (p:ps) index = do
     mvWAddStr w (y + 1) 0 p 
     return()
 
-openFile :: [FilePath] -> Int -> IO Int
-openFile [] _ = return 0
-openFile list index = do
+openFile :: Window -> [FilePath] -> Int -> IO Int
+openFile _ [] _ = return 0
+openFile win list index = do
     if (last (list !! index) == '/') then do
         dir <- getCurrentDirectory
         cd (init (list !! index))
         return 0
-    else return index
+    else do
+        let extension = dropWhile (/= '.') (list !! index)
+            program = if (not (Dispatch.isCodeFile extension)) then (head $ Dispatch.procedures extension) else "vim"
+            file = list !! index
+        handle <- spawnProcess "nohup" [program, file, " > /dev/null &"]
+        wclear win
+        refresh
+        return index
+--    else return index
 
 display :: Window -> Int -> Int -> IO()
 display w index scroll = do
@@ -110,7 +123,6 @@ display w index scroll = do
         viewableList = take (y - 2) $ drop scroll sortedList
     printDirectoryList w viewableList index
     wMove w 0 60
-    wAddStr w (show (len))
 --    update
     refresh
     wclear w
@@ -133,7 +145,7 @@ display w index scroll = do
             else if index > 0 then display w (index - 1) 0
             else display w index scroll
         KeyChar 'l' -> do 
-            index <- openFile viewableList index
+            index <- openFile w viewableList index
             display w index 0
         _   -> display w index 0
 
