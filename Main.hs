@@ -6,13 +6,15 @@ import System.Process
 import qualified Dispatch as Dispatch
 
 -- TODO LIST
--- Opening files in terminal
--- Finding installed programs for opening files
+-- Truncation of filepaths
+-- Open with: 
 -- Searching
 -- mv, cp, rm
 -- Figure out multiple windows
--- Adding more filetypes and default programs
 -- Optimization
+-- Fix nohup hack
+-- Show command "history" after closing, rather than clearing. --> Close like ranger.
+-- Give user option to use Dispatch rather than xdg-open
 
 -- ERRORS TO FIX
 -- Fix index shift after opening file
@@ -90,21 +92,44 @@ printDirectoryList' w (p:ps) index = do
     mvWAddStr w (y + 1) 0 p 
     return()
 
-openFile :: Window -> [FilePath] -> Int -> IO Int
-openFile _ [] _ = return 0
-openFile win list index = do
+openFile :: Window -> [FilePath] -> Int -> Bool -> IO Int
+openFile _ [] _ _ = return 0
+openFile win list index decouple = do
+    dir <- getCurrentDirectory
+    -- Formatting filepath to be parsed by the system command on line 109.
+    let dir' = ((formatDirectory ' ' "\\ ") . (formatDirectory '\'' "\\'")) dir
     if (last (list !! index) == '/') then do
-        dir <- getCurrentDirectory
         cd (init (list !! index))
         return 0
     else do
-        let extension = dropWhile (/= '.') (list !! index)
-            program = if (not (Dispatch.isCodeFile extension)) then (head $ Dispatch.procedures extension) else "vim"
-            file = list !! index
-        handle <- spawnProcess "nohup" [program, file, " > /dev/null &"]
+        let file = list !! index
+        if decouple then do 
+            handle <- spawnProcess "nohup" ["xdg-open",file]
+            system $ "rm " ++ dir' ++ "/nohup.out"
+            wclear win
+            refresh
+            return index
+        else do 
+            callProcess "xdg-open" [file]
+            wclear win
+            cursSet CursorInvisible
+            refresh
+            return index
         wclear win
+        cursSet CursorInvisible
         refresh
         return index
+--    else do
+--        let extension = dropWhile (/= '.') (list !! index)
+--            program = if (not (Dispatch.isCodeFile extension)) then (head $ Dispatch.procedures extension) else (head $ Dispatch.procedures "code")
+--            file = list !! index
+--        handle <- spawnProcess "nohup" [program, file]
+--        system $ program ++ " " ++ file
+--        wclear win
+--        refresh
+--        wclear win
+--        refresh
+--        return index
 --    else return index
 
 display :: Window -> Int -> Int -> IO()
@@ -123,7 +148,6 @@ display w index scroll = do
         viewableList = take (y - 2) $ drop scroll sortedList
     printDirectoryList w viewableList index
     wMove w 0 60
---    update
     refresh
     wclear w
     c <- getCh
@@ -144,8 +168,12 @@ display w index scroll = do
             else if (scroll > 0) then display w index (scroll - 1)
             else if index > 0 then display w (index - 1) 0
             else display w index scroll
-        KeyChar 'l' -> do 
-            index <- openFile w viewableList index
+        KeyChar 'l' -> do --Open file, disowning the process
+            index <- openFile w viewableList index True
+            display w index 0
+        --Return key
+        KeyChar '\n' -> do --Open file, waiting for process to terminate
+            index <- openFile w viewableList index False
             display w index 0
         _   -> display w index 0
 
@@ -159,3 +187,4 @@ main = do
     wMove w 20 20 
     display w 0 0
     endWin
+    system "clear"

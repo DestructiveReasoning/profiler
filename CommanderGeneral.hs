@@ -4,6 +4,7 @@ module CommanderGeneral
   , getDirectoryList
   , sortDirectoryList
   , removeCommons
+  , formatDirectory
 ) where
 
 import Control.Monad
@@ -24,6 +25,10 @@ prompt :: String -> IO()
 prompt s = do
     putStr s
     hFlush stdout
+
+formatDirectory :: Char -> String -> FilePath -> FilePath
+formatDirectory _ _ [] = []
+formatDirectory x y (s:ss) = if s == x then (y ++ (formatDirectory x y ss)) else s:(formatDirectory x y ss)
 
 ls :: FilePath -> IO()
 ls path = do

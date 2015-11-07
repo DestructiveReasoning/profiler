@@ -22,9 +22,10 @@ dispatch = [(".pdf",["evince","mupdf"]),
             (".gp4",["tuxguitar"]),
             (".gp5",["tuxguitar"]),
             (".gp6",["tuxguitar"]),
+            ("code",["vim","subl","gedit","emacs","nano"]),
             (".epub",["cr3"])]
 
-code = [".hs",".c",".cpp",".h",".java",".hpp",".py",".js",".cs",".sh",".txt",".tex",""]
+code = [".hs",".c",".cpp",".h",".java",".hpp",".py",".js",".cs",".sh",".txt",".tex"]
 
 isCodeFile :: String -> Bool
 isCodeFile ext = ext `elem` code
