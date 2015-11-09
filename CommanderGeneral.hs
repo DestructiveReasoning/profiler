@@ -8,6 +8,7 @@ module CommanderGeneral
   , truncateFile
   , lastChar
   , findPattern
+  , fileChar
 ) where
 
 import Control.Monad
@@ -16,6 +17,8 @@ import System.Exit
 import System.IO
 import System.Process
 import Data.Char
+
+fileChar = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'] ++ ['1'..'9'] ++ "!@#$%^&*()_+~`^-={}/?\"\';:<>,. "
 
 data Command = PROMPT|EXIT deriving (Eq)
 

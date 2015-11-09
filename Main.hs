@@ -3,11 +3,13 @@ import UI.HSCurses.CursesHelper
 import CommanderGeneral
 import System.Directory
 import System.Process
+import System.Exit
 import qualified Dispatch as Dispatch
 
 -- TODO LIST
+-- Have openFile return (Index, Scroll) for accurate positioning after a file is opened
 -- Open with: 
--- Fix backspace in search
+-- Make findPattern return a list of items matching the pattern to implement 'next' function
 -- mv, cp, rm
 -- Figure out multiple windows
 -- Optimization
@@ -159,25 +161,25 @@ search w x i s dir "" = do
     c <- getCh
     case c of
         KeyChar '\n' -> display w i s True
-        KeyChar q -> search w x i s dir ("/" ++ [q])
+        KeyChar q -> if q `elem` fileChar then search w x i s dir ("/" ++ [q]) else search w x i s dir ""
         _ -> search w x i s dir ""
 search w x i s dir (p:ps) = do
     (y,_) <- scrSize 
     let index = if findPattern dir ps < (length dir) then findPattern dir ps else (length dir - 1)
         scroll = calculateIndexScroll' dir y index
 --    let (index,scroll) = calculateIndexScroll dir y index
+    wclear w
     display w (index -scroll) scroll False
     wMove w (y-1) x
     wAttrSet w (attr0,colorYellow)
     wAddStr w (p:ps)
     wAttrSet w (attr0,(Pair 0))
-    wclear w
     refresh
     c <- getCh
     case c of
-        KeyBackspace -> search w x (index - scroll) scroll dir (p:(init ps))
+        KeyChar '\b' -> if (length (p:ps)) > 1 then search w x (index - scroll) scroll dir (p:(init ps)) else search w x 0 0 dir ""
         KeyChar '\n' -> display w (index - scroll) scroll True
-        KeyChar q -> search w x (index - scroll) scroll dir ((p:ps) ++ [q])
+        KeyChar q -> if q `elem` fileChar then search w x (index - scroll) scroll dir ((p:ps) ++ [q]) else search w x i s dir (p:ps)
         _ -> search w x (index - scroll) scroll dir (p:ps)
 
 display :: Window -> Int -> Int -> Bool -> IO()
@@ -207,9 +209,6 @@ display w index scroll prompt= do
                 cd ".."
                 display w 0 0 True
             KeyChar 'j' -> do
---                let s = calculateIndexScroll' sortedList y (index + 1)
---                in  if index < ((length viewableList) -1) then display w (index - s) (s) True
---                    else display w (index - s) s True
                 if ((index <= scrollThreshold || len <= (y-3)) && index < ((length viewableList) - 1) && scroll == 0) then display w (index + 1) 0 True
                 else if ((index <= scrollThreshold || len <= (y-3)) && scroll == 0) then display w (index) 0 True
                 else if (scroll < len + 3 - y) then display w index (scroll + 1) True
@@ -230,8 +229,67 @@ display w index scroll prompt= do
             --Return key
             KeyChar '\n' -> do --Open file, waiting for process to terminate
                 index <- openFile w viewableList index False
-                display w index scroll True
+                display w index 0 True
             _   -> display w index scroll True
+    else return()
+
+display' :: Window -> [FilePath] -> Int -> Int -> Bool -> IO()
+display' w fpath index scroll prompt= do
+    (y,_) <- scrSize
+    let scrollThreshold = y `div` 2
+    wMove w 0 0 
+    dir <- getCurrentDirectory
+    wAttrSet w (folder, colorYellow);
+    wAddStr w dir
+    wAttrSet w (attr0,(Pair 0))
+    wMove w 1 0
+--    let sortedList = sortDirectoryList list
+    let len = length fpath
+        viewableList = take (y - 3) $ drop scroll fpath
+    printDirectoryList w viewableList index
+    wMove w 0 60
+    refresh
+    if prompt then do
+        wclear w
+        c <- getCh
+        case c of 
+            KeyChar 'q' -> return ()
+            KeyChar 'h' -> do
+                cd ".."
+                newdir <- getCurrentDirectory
+                newlist <- getDirectoryContents newdir
+                let newSortedList = sortDirectoryList newlist
+                display' w newSortedList 0 0 True
+            KeyChar 'j' -> do
+                if ((index <= scrollThreshold || len <= (y-3)) && index < ((length viewableList) - 1) && scroll == 0) then display' w fpath (index + 1) 0 True
+                else if ((index <= scrollThreshold || len <= (y-3)) && scroll == 0) then display' w fpath (index) 0 True
+                else if (scroll < len + 3 - y) then display' w fpath index (scroll + 1) True
+                else if (index < (length viewableList) - 1) then display' w fpath (index + 1) (len + 3 - y) True
+                else display' w fpath index scroll True
+            KeyChar 'k' -> do
+                if (len <= (y-3) && index > 0) then display' w fpath (index - 1) 0 True
+                else if (index > scrollThreshold + 1) then display' w fpath (index - 1) (len + 3 - y) True
+                else if (scroll > 0) then display' w fpath index (scroll - 1) True
+                else if index > 0 then display' w fpath (index - 1) 0 True
+                else display' w fpath index scroll True
+            KeyChar 'l' -> do --Open file, disowning the process
+                index <- openFile w viewableList index True
+                newdir <- getCurrentDirectory
+                newlist <- getDirectoryContents newdir
+                let newSortedList = sortDirectoryList newlist
+                display' w newSortedList index scroll True
+            KeyChar '/' -> do
+                search w 0 index scroll fpath ""
+                
+            --Return key
+            KeyChar '\n' -> do --Open file, waiting for process to terminate
+                index <- openFile w viewableList index False
+                newdir <- getCurrentDirectory
+                newlist <- getDirectoryContents newdir
+                let newSortedList = sortDirectoryList newlist
+                display' w newSortedList index scroll True
+
+            _   -> display' w fpath index scroll True
     else return()
 
 main = do
@@ -242,6 +300,10 @@ main = do
     echo False
     w <- initScr
     wMove w 20 20 
+    dir <- getCurrentDirectory
+    list <- getDirectoryContents dir
+    let sortedList = sortDirectoryList list
+--    display' w sortedList 0 0 True
     display w 0 0 True
     endWin
     system "clear"
