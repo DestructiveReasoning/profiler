@@ -5,6 +5,9 @@ module CommanderGeneral
   , sortDirectoryList
   , removeCommons
   , formatDirectory
+  , truncateFile
+  , lastChar
+  , findPattern
 ) where
 
 import Control.Monad
@@ -25,6 +28,21 @@ prompt :: String -> IO()
 prompt s = do
     putStr s
     hFlush stdout
+
+findPattern :: [String] -> String -> Int
+findPattern list pattern = 
+    let len = length pattern
+        in length $ takeWhile(/= pattern) $ map (take len) list
+--        in foldl (\acc x -> if ((take len) x) == pattern then acc else acc + 1) 0 list                          
+
+lastChar :: [Char] -> Char
+lastChar [] = ' '
+lastChar xs = head $ (dropWhile (== ' ') . reverse) xs
+
+truncateFile :: Int -> FilePath -> FilePath
+truncateFile len file = if (length file <= len) then file
+                        else if (lastChar file == '/') then (take (len - 3) file) ++ "~~/"
+                        else (take (len - 3) file) ++ "..."
 
 formatDirectory :: Char -> String -> FilePath -> FilePath
 formatDirectory _ _ [] = []

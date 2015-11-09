@@ -6,15 +6,15 @@ import System.Process
 import qualified Dispatch as Dispatch
 
 -- TODO LIST
--- Truncation of filepaths
 -- Open with: 
--- Searching
+-- Fix backspace in search
 -- mv, cp, rm
 -- Figure out multiple windows
 -- Optimization
 -- Fix nohup hack
 -- Show command "history" after closing, rather than clearing. --> Close like ranger.
 -- Give user option to use Dispatch rather than xdg-open
+-- Search Todo
 
 -- ERRORS TO FIX
 -- Fix index shift after opening file
@@ -51,9 +51,6 @@ spaces :: Int -> [Char]
 spaces 0 = []
 spaces x = ' ':(spaces (x - 1))
 
-lastChar :: [Char] -> Char
-lastChar [] = ' '
-lastChar xs = head $ (dropWhile (== ' ') . reverse) xs
 
 printUnselected :: Window -> [FilePath] -> IO()
 printUnselected  _ [] = return()
@@ -75,12 +72,14 @@ printSelected w fp = do
 printDirectoryList :: Window -> [FilePath] -> Int -> IO()
 printDirectoryList _ [] _ = return()
 printDirectoryList w pps index = do
-    -- Extract selected item from list
     (_,x) <- scrSize
-    let formattedList = map (\s -> if (length s) < (x `div` 3) then s ++ (spaces ((x `div` 3) - (length s))) else s) pps
+    let width = x `div` 3
+    let formattedList = map ((\s -> if (length s) < width then s ++ (spaces (width - (length s))) else s) . (truncateFile width)) pps
+    -- Extract selected item from list
     let reg1 = take index formattedList       --Set of items before the selected item 
         sel  = formattedList !! index         --Selected item 
         reg2 = drop (index + 1) formattedList --Set of items after the selected item
+    -- TODO Add * in front of selected. Call one print function that decides color based on *.
     printUnselected w reg1 
     printSelected w sel
     printUnselected w reg2
@@ -115,7 +114,7 @@ openFile win list index decouple = do
             cursSet CursorInvisible
             refresh
             return index
-        wclear win
+--        wclear win
         cursSet CursorInvisible
         refresh
         return index
@@ -132,8 +131,57 @@ openFile win list index decouple = do
 --        return index
 --    else return index
 
-display :: Window -> Int -> Int -> IO()
-display w index scroll = do
+calculateIndexScroll :: [FilePath] -> Int -> Int -> (Int,Int)
+calculateIndexScroll list height index =
+    let scrollThreshold = height `div` 2
+        len = length list
+        in  if index <= scrollThreshold then (index,0)
+            else if index < (len + 3 - height) then (index,index - scrollThreshold)
+            else (index,len + 3 - height)
+
+calculateIndexScroll' :: [FilePath] -> Int -> Int -> Int
+calculateIndexScroll' list height index =
+    let scrollThreshold = height `div` 2
+        len = length list
+        in  if index <= scrollThreshold then 0
+            else if index < (len + 3 - height) then index - scrollThreshold
+            else len + 3 - height
+
+search :: Window -> Int -> Int -> Int -> [FilePath] -> String -> IO()
+search w x i s dir "" = do
+    (y,_) <- scrSize
+    wMove w (y - 1) x 
+    wAttrSet w (attr0,colorYellow)
+    wAddStr w "/"
+    wAttrSet w (attr0,(Pair 0))
+    display w i s False
+    refresh
+    c <- getCh
+    case c of
+        KeyChar '\n' -> display w i s True
+        KeyChar q -> search w x i s dir ("/" ++ [q])
+        _ -> search w x i s dir ""
+search w x i s dir (p:ps) = do
+    (y,_) <- scrSize 
+    let index = if findPattern dir ps < (length dir) then findPattern dir ps else (length dir - 1)
+        scroll = calculateIndexScroll' dir y index
+--    let (index,scroll) = calculateIndexScroll dir y index
+    display w (index -scroll) scroll False
+    wMove w (y-1) x
+    wAttrSet w (attr0,colorYellow)
+    wAddStr w (p:ps)
+    wAttrSet w (attr0,(Pair 0))
+    wclear w
+    refresh
+    c <- getCh
+    case c of
+        KeyBackspace -> search w x (index - scroll) scroll dir (p:(init ps))
+        KeyChar '\n' -> display w (index - scroll) scroll True
+        KeyChar q -> search w x (index - scroll) scroll dir ((p:ps) ++ [q])
+        _ -> search w x (index - scroll) scroll dir (p:ps)
+
+display :: Window -> Int -> Int -> Bool -> IO()
+display w index scroll prompt= do
     (y,_) <- scrSize
     let scrollThreshold = y `div` 2
     wMove w 0 0 
@@ -143,39 +191,48 @@ display w index scroll = do
     wAttrSet w (attr0,(Pair 0))
     wMove w 1 0
     list <- getDirectoryList dir
+    -- TODO move this code into input parsing to eliminate sorting every frame
     let sortedList = sortDirectoryList list
         len = length sortedList
-        viewableList = take (y - 2) $ drop scroll sortedList
+        viewableList = take (y - 3) $ drop scroll sortedList
     printDirectoryList w viewableList index
     wMove w 0 60
     refresh
-    wclear w
-    c <- getCh
-    case c of 
-        KeyChar 'q' -> return ()
-        KeyChar 'h' -> do
-            cd ".."
-            display w 0 0
-        KeyChar 'j' -> do
-            if ((index <= scrollThreshold || len <= (y-2)) && index < ((length viewableList) - 1)) then display w (index + 1) 0
-            else if ((index <= scrollThreshold || len <= (y-2))) then display w (index) 0
-            else if (scroll < len + 2 - y) then display w index (scroll + 1)
-            else if (index < (length viewableList) - 1) then display w (index + 1) (len + 2 - y)
-            else display w index scroll
-        KeyChar 'k' -> do
-            if (len <= (y-2) && index > 0) then display w (index - 1) 0
-            else if (index > scrollThreshold + 1) then display w (index - 1) (len + 2 - y)
-            else if (scroll > 0) then display w index (scroll - 1)
-            else if index > 0 then display w (index - 1) 0
-            else display w index scroll
-        KeyChar 'l' -> do --Open file, disowning the process
-            index <- openFile w viewableList index True
-            display w index 0
-        --Return key
-        KeyChar '\n' -> do --Open file, waiting for process to terminate
-            index <- openFile w viewableList index False
-            display w index 0
-        _   -> display w index 0
+    if prompt then do
+        wclear w
+        c <- getCh
+        case c of 
+            KeyChar 'q' -> return ()
+            KeyChar 'h' -> do
+                cd ".."
+                display w 0 0 True
+            KeyChar 'j' -> do
+--                let s = calculateIndexScroll' sortedList y (index + 1)
+--                in  if index < ((length viewableList) -1) then display w (index - s) (s) True
+--                    else display w (index - s) s True
+                if ((index <= scrollThreshold || len <= (y-3)) && index < ((length viewableList) - 1) && scroll == 0) then display w (index + 1) 0 True
+                else if ((index <= scrollThreshold || len <= (y-3)) && scroll == 0) then display w (index) 0 True
+                else if (scroll < len + 3 - y) then display w index (scroll + 1) True
+                else if (index < (length viewableList) - 1) then display w (index + 1) (len + 3 - y) True
+                else display w index scroll True
+            KeyChar 'k' -> do
+                if (len <= (y-3) && index > 0) then display w (index - 1) 0 True
+                else if (index > scrollThreshold + 1) then display w (index - 1) (len + 3 - y) True
+                else if (scroll > 0) then display w index (scroll - 1) True
+                else if index > 0 then display w (index - 1) 0 True
+                else display w index scroll True
+            KeyChar 'l' -> do --Open file, disowning the process
+                index <- openFile w viewableList index True
+                display w index 0 True
+            KeyChar '/' -> do
+                search w 0 index scroll sortedList ""
+                
+            --Return key
+            KeyChar '\n' -> do --Open file, waiting for process to terminate
+                index <- openFile w viewableList index False
+                display w index scroll True
+            _   -> display w index scroll True
+    else return()
 
 main = do
     initCurses
@@ -185,6 +242,6 @@ main = do
     echo False
     w <- initScr
     wMove w 20 20 
-    display w 0 0
+    display w 0 0 True
     endWin
     system "clear"
