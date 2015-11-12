@@ -7,19 +7,18 @@ import System.Exit
 import qualified Dispatch as Dispatch
 
 -- TODO LIST
--- Have openFile return (Index, Scroll) for accurate positioning after a file is opened
--- Open with: 
 -- Make findPattern return a list of items matching the pattern to implement 'next' function
 -- mv, cp, rm
 -- Figure out multiple windows
 -- Optimization
+-- Try scrolling without bounds using diplay'
 -- Fix nohup hack
+-- Give open with capability to spawn terminal applications
 -- Show command "history" after closing, rather than clearing. --> Close like ranger.
 -- Give user option to use Dispatch rather than xdg-open
 -- Search Todo
 
 -- ERRORS TO FIX
--- Fix index shift after opening file
 -- Fix performance in color-unfriendly terminals
 
 -- ATTRIBUTES
@@ -86,6 +85,7 @@ printDirectoryList w pps index = do
     printSelected w sel
     printUnselected w reg2
 
+-- For testing the efficiency of printDirectoryList, this is not a substitute
 printDirectoryList':: Window -> [FilePath] -> Int -> IO()
 printDirectoryList' _ [] _ = return ()
 printDirectoryList' w (p:ps) index = do
@@ -93,15 +93,54 @@ printDirectoryList' w (p:ps) index = do
     mvWAddStr w (y + 1) 0 p 
     return()
 
-openFile :: Window -> [FilePath] -> Int -> Bool -> IO Int
-openFile _ [] _ _ = return 0
-openFile win list index decouple = do
+openWith :: Window -> [FilePath] -> Int -> Int -> String -> IO ()
+openWith w filepath index scroll prog = do
+    (y,_) <- scrSize
+    dir' <- getCurrentDirectory
+    wclear w
+    display w index scroll False
+    wMove w (y - 1) 0
+    wAttrSet w (attr0,colorYellow)
+    if(findPattern [prog] "not found" == 0) then do 
+        let prog' = "" 
+        wAddStr w (prog)
+        return()
+    else do 
+        let prog' = prog 
+        wAddStr w ("Open with: " ++ prog')
+        wAttrSet w (attr0,(Pair 0))
+        display w index scroll False
+        res <- findExecutable prog
+        refresh
+        c <- getCh
+        case c of 
+            KeyChar '\b'    ->
+                if (length prog < 1) then return()
+                else do openWith w filepath index scroll (init prog) 
+            KeyChar '\n'    ->
+                -- Open file with desired program
+                if (length prog < 1) then do wclear w; return()
+                else if res == Nothing then openWith w filepath index scroll ("not found: " ++ prog)
+                else do
+                    handle <- spawnProcess "nohup" [prog,(filepath !! index)]
+                    system $ "rm " ++ dir' ++ "/nohup.out"
+                    wclear w
+                    refresh
+                    return()
+            KeyChar q       ->
+                if q `elem` fileChar then openWith w filepath index scroll (prog ++ [q])
+                else openWith w filepath index scroll prog
+            _               -> openWith w filepath index scroll prog
+
+openFile' :: Window -> [FilePath] -> Int -> Int -> Bool -> IO (Int,Int)
+openFile' _ [] index scroll _ = return (index,scroll)
+openFile' win list index scroll decouple = do
     dir <- getCurrentDirectory
     -- Formatting filepath to be parsed by the system command on line 109.
     let dir' = ((formatDirectory ' ' "\\ ") . (formatDirectory '\'' "\\'")) dir
     if (last (list !! index) == '/') then do
         cd (init (list !! index))
-        return 0
+        return (0,0)
     else do
         let file = list !! index
         if decouple then do 
@@ -109,29 +148,17 @@ openFile win list index decouple = do
             system $ "rm " ++ dir' ++ "/nohup.out"
             wclear win
             refresh
-            return index
+            return (index,scroll)
         else do 
             callProcess "xdg-open" [file]
             wclear win
             cursSet CursorInvisible
             refresh
-            return index
+            return (index,scroll)
 --        wclear win
         cursSet CursorInvisible
         refresh
-        return index
---    else do
---        let extension = dropWhile (/= '.') (list !! index)
---            program = if (not (Dispatch.isCodeFile extension)) then (head $ Dispatch.procedures extension) else (head $ Dispatch.procedures "code")
---            file = list !! index
---        handle <- spawnProcess "nohup" [program, file]
---        system $ program ++ " " ++ file
---        wclear win
---        refresh
---        wclear win
---        refresh
---        return index
---    else return index
+        return (index,scroll)
 
 calculateIndexScroll :: [FilePath] -> Int -> Int -> (Int,Int)
 calculateIndexScroll list height index =
@@ -156,11 +183,11 @@ search w x i s dir "" = do
     wAttrSet w (attr0,colorYellow)
     wAddStr w "/"
     wAttrSet w (attr0,(Pair 0))
-    display w i s False
+    display' w dir i s False
     refresh
     c <- getCh
     case c of
-        KeyChar '\n' -> display w i s True
+        KeyChar '\n' -> do wclear w; display' w dir i s True
         KeyChar q -> if q `elem` fileChar then search w x i s dir ("/" ++ [q]) else search w x i s dir ""
         _ -> search w x i s dir ""
 search w x i s dir (p:ps) = do
@@ -169,7 +196,7 @@ search w x i s dir (p:ps) = do
         scroll = calculateIndexScroll' dir y index
 --    let (index,scroll) = calculateIndexScroll dir y index
     wclear w
-    display w (index -scroll) scroll False
+    display' w dir (index -scroll) scroll False
     wMove w (y-1) x
     wAttrSet w (attr0,colorYellow)
     wAddStr w (p:ps)
@@ -178,7 +205,7 @@ search w x i s dir (p:ps) = do
     c <- getCh
     case c of
         KeyChar '\b' -> if (length (p:ps)) > 1 then search w x (index - scroll) scroll dir (p:(init ps)) else search w x 0 0 dir ""
-        KeyChar '\n' -> display w (index - scroll) scroll True
+        KeyChar '\n' -> do wclear w; display' w dir (index - scroll) scroll True
         KeyChar q -> if q `elem` fileChar then search w x (index - scroll) scroll dir ((p:ps) ++ [q]) else search w x i s dir (p:ps)
         _ -> search w x (index - scroll) scroll dir (p:ps)
 
@@ -221,14 +248,14 @@ display w index scroll prompt= do
                 else if index > 0 then display w (index - 1) 0 True
                 else display w index scroll True
             KeyChar 'l' -> do --Open file, disowning the process
-                index <- openFile w viewableList index True
+                (index',scroll') <- openFile' w viewableList index scroll True
                 display w index 0 True
             KeyChar '/' -> do
                 search w 0 index scroll sortedList ""
                 
             --Return key
             KeyChar '\n' -> do --Open file, waiting for process to terminate
-                index <- openFile w viewableList index False
+                (index',scroll') <- openFile' w viewableList index scroll False
                 display w index 0 True
             _   -> display w index scroll True
     else return()
@@ -257,7 +284,7 @@ display' w fpath index scroll prompt= do
             KeyChar 'h' -> do
                 cd ".."
                 newdir <- getCurrentDirectory
-                newlist <- getDirectoryContents newdir
+                newlist <- getDirectoryList newdir
                 let newSortedList = sortDirectoryList newlist
                 display' w newSortedList 0 0 True
             KeyChar 'j' -> do
@@ -273,20 +300,25 @@ display' w fpath index scroll prompt= do
                 else if index > 0 then display' w fpath (index - 1) 0 True
                 else display' w fpath index scroll True
             KeyChar 'l' -> do --Open file, disowning the process
-                index <- openFile w viewableList index True
+                (index',scroll') <- openFile' w viewableList index scroll True
                 newdir <- getCurrentDirectory
-                newlist <- getDirectoryContents newdir
+                newlist <- getDirectoryList newdir
                 let newSortedList = sortDirectoryList newlist
-                display' w newSortedList index scroll True
+                display' w newSortedList index' scroll' True
             KeyChar '/' -> do
                 search w 0 index scroll fpath ""
                 
             --Return key
             KeyChar '\n' -> do --Open file, waiting for process to terminate
-                index <- openFile w viewableList index False
+                (index',scroll') <- openFile' w viewableList index scroll False
                 newdir <- getCurrentDirectory
-                newlist <- getDirectoryContents newdir
+                newlist <- getDirectoryList newdir
                 let newSortedList = sortDirectoryList newlist
+                display' w newSortedList index' scroll' True
+
+            KeyChar 'o' -> do
+                openWith w (viewableList) index scroll ""
+                let newSortedList = sortDirectoryList fpath
                 display' w newSortedList index scroll True
 
             _   -> display' w fpath index scroll True
@@ -301,9 +333,9 @@ main = do
     w <- initScr
     wMove w 20 20 
     dir <- getCurrentDirectory
-    list <- getDirectoryContents dir
+    list <- getDirectoryList dir
     let sortedList = sortDirectoryList list
---    display' w sortedList 0 0 True
-    display w 0 0 True
+    display' w sortedList 0 0 True
+--    display w 0 0 True
     endWin
     system "clear"
