@@ -1,20 +1,21 @@
-import UI.HSCurses.Curses
-import UI.HSCurses.CursesHelper
 import CommanderGeneral
 import System.Directory
-import System.Process
 import System.Exit
+import System.Process
+import UI.HSCurses.Curses
+import UI.HSCurses.CursesHelper
 import qualified Dispatch as Dispatch
 
 -- TODO LIST
--- Make findPattern return a list of items matching the pattern to implement 'next' function
 -- mv, cp, rm
 -- Figure out multiple windows
 -- Optimization
 -- Try scrolling without bounds using diplay'
 -- Fix nohup hack
 -- Give open with capability to spawn terminal applications
--- Show command "history" after closing, rather than clearing. --> Close like ranger.
+-- Test out next in search function
+-- Search for patterns in middle of file name?
+-- Show command "history" after closing, rather than clearing. --> Close like ranger. (Possibly forkProcess from System.Posix.Process?)
 -- Give user option to use Dispatch rather than xdg-open
 -- Search Todo
 
@@ -51,7 +52,6 @@ colorMagenta = Pair 3
 spaces :: Int -> [Char]
 spaces 0 = []
 spaces x = ' ':(spaces (x - 1))
-
 
 printUnselected :: Window -> [FilePath] -> IO()
 printUnselected  _ [] = return()
@@ -176,38 +176,45 @@ calculateIndexScroll' list height index =
             else if index < (len + 3 - height) then index - scrollThreshold
             else len + 3 - height
 
-search :: Window -> Int -> Int -> Int -> [FilePath] -> String -> IO()
-search w x i s dir "" = do
+search :: Window -> Int -> Int -> Int -> [FilePath] -> String -> Bool -> IO()
+search w x i s dir "" prompt = do
     (y,_) <- scrSize
     wMove w (y - 1) x 
     wAttrSet w (attr0,colorYellow)
     wAddStr w "/"
     wAttrSet w (attr0,(Pair 0))
-    display' w dir i s False
+    display' w dir i s "" False
     refresh
-    c <- getCh
-    case c of
-        KeyChar '\n' -> do wclear w; display' w dir i s True
-        KeyChar q -> if q `elem` fileChar then search w x i s dir ("/" ++ [q]) else search w x i s dir ""
-        _ -> search w x i s dir ""
-search w x i s dir (p:ps) = do
+    if prompt then do
+        c <- getCh
+        case c of
+            KeyChar '\n' -> do wclear w; display' w dir i s "" True
+            KeyChar q -> if q `elem` fileChar then search w x i s dir ("/" ++ [q]) True else search w x i s dir "" True
+            _ -> search w x i s dir "" True
+    else display' w dir i s "" True
+search w x i s dir (p:ps) prompt = do
     (y,_) <- scrSize 
     let index = if findPattern dir ps < (length dir) then findPattern dir ps else (length dir - 1)
-        scroll = calculateIndexScroll' dir y index
+        indices = getListFromPattern dir ps
+        nextIndices = if (length indices == 0) then [i] else if (last indices) <= i + s then indices else dropWhile (<= i + s) indices
+        index' = head nextIndices
+        scroll = calculateIndexScroll' dir y index'
 --    let (index,scroll) = calculateIndexScroll dir y index
     wclear w
-    display' w dir (index -scroll) scroll False
+    display' w dir (index' -scroll) scroll "" False
     wMove w (y-1) x
     wAttrSet w (attr0,colorYellow)
     wAddStr w (p:ps)
     wAttrSet w (attr0,(Pair 0))
     refresh
-    c <- getCh
-    case c of
-        KeyChar '\b' -> if (length (p:ps)) > 1 then search w x (index - scroll) scroll dir (p:(init ps)) else search w x 0 0 dir ""
-        KeyChar '\n' -> do wclear w; display' w dir (index - scroll) scroll True
-        KeyChar q -> if q `elem` fileChar then search w x (index - scroll) scroll dir ((p:ps) ++ [q]) else search w x i s dir (p:ps)
-        _ -> search w x (index - scroll) scroll dir (p:ps)
+    if prompt then do
+        c <- getCh
+        case c of
+            KeyChar '\b' -> if (length (p:ps)) > 1 then search w x (index - scroll) scroll dir (p:(init ps)) True else search w x 0 0 dir "" True
+            KeyChar '\n' -> do wclear w; display' w dir (index - scroll) scroll (p:ps) True
+            KeyChar q -> if q `elem` fileChar then search w x (index - scroll) scroll dir ((p:ps) ++ [q]) True else search w x i s dir (p:ps) True
+            _ -> search w x (index - scroll) scroll dir (p:ps) True
+    else display' w dir (index' - scroll) scroll (p:ps) True
 
 display :: Window -> Int -> Int -> Bool -> IO()
 display w index scroll prompt= do
@@ -251,7 +258,7 @@ display w index scroll prompt= do
                 (index',scroll') <- openFile' w viewableList index scroll True
                 display w index 0 True
             KeyChar '/' -> do
-                search w 0 index scroll sortedList ""
+                search w 0 index scroll sortedList "" True
                 
             --Return key
             KeyChar '\n' -> do --Open file, waiting for process to terminate
@@ -260,8 +267,8 @@ display w index scroll prompt= do
             _   -> display w index scroll True
     else return()
 
-display' :: Window -> [FilePath] -> Int -> Int -> Bool -> IO()
-display' w fpath index scroll prompt= do
+display' :: Window -> [FilePath] -> Int -> Int -> String -> Bool -> IO()
+display' w fpath index scroll lastSearch prompt= do
     (y,_) <- scrSize
     let scrollThreshold = y `div` 2
     wMove w 0 0 
@@ -286,27 +293,30 @@ display' w fpath index scroll prompt= do
                 newdir <- getCurrentDirectory
                 newlist <- getDirectoryList newdir
                 let newSortedList = sortDirectoryList newlist
-                display' w newSortedList 0 0 True
+                display' w newSortedList 0 0 lastSearch True
             KeyChar 'j' -> do
-                if ((index <= scrollThreshold || len <= (y-3)) && index < ((length viewableList) - 1) && scroll == 0) then display' w fpath (index + 1) 0 True
-                else if ((index <= scrollThreshold || len <= (y-3)) && scroll == 0) then display' w fpath (index) 0 True
-                else if (scroll < len + 3 - y) then display' w fpath index (scroll + 1) True
-                else if (index < (length viewableList) - 1) then display' w fpath (index + 1) (len + 3 - y) True
-                else display' w fpath index scroll True
+                if ((index <= scrollThreshold || len <= (y-3)) && index < ((length viewableList) - 1) && scroll == 0) then display' w fpath (index + 1) 0 lastSearch True
+                else if ((index <= scrollThreshold || len <= (y-3)) && scroll == 0) then display' w fpath (index) 0 lastSearch True
+                else if (scroll < len + 3 - y) then display' w fpath index (scroll + 1) lastSearch True
+                else if (index < (length viewableList) - 1) then display' w fpath (index + 1) (len + 3 - y) lastSearch True
+                else display' w fpath index scroll lastSearch True
             KeyChar 'k' -> do
-                if (len <= (y-3) && index > 0) then display' w fpath (index - 1) 0 True
-                else if (index > scrollThreshold + 1) then display' w fpath (index - 1) (len + 3 - y) True
-                else if (scroll > 0) then display' w fpath index (scroll - 1) True
-                else if index > 0 then display' w fpath (index - 1) 0 True
-                else display' w fpath index scroll True
+                if (len <= (y-3) && index > 0) then display' w fpath (index - 1) 0 lastSearch True
+                else if (index > scrollThreshold + 1) then display' w fpath (index - 1) (len + 3 - y) lastSearch True
+                else if (scroll > 0) then display' w fpath index (scroll - 1) lastSearch True
+                else if index > 0 then display' w fpath (index - 1) 0 lastSearch True
+                else display' w fpath index scroll lastSearch True
             KeyChar 'l' -> do --Open file, disowning the process
                 (index',scroll') <- openFile' w viewableList index scroll True
                 newdir <- getCurrentDirectory
                 newlist <- getDirectoryList newdir
                 let newSortedList = sortDirectoryList newlist
-                display' w newSortedList index' scroll' True
+                display' w newSortedList index' scroll' lastSearch True
+            KeyChar '0' -> display' w fpath 0 0 lastSearch True
             KeyChar '/' -> do
-                search w 0 index scroll fpath ""
+                search w 0 index scroll fpath "" True
+            KeyChar 'n' -> do
+                search w 0 (index) scroll fpath lastSearch False
                 
             --Return key
             KeyChar '\n' -> do --Open file, waiting for process to terminate
@@ -314,14 +324,14 @@ display' w fpath index scroll prompt= do
                 newdir <- getCurrentDirectory
                 newlist <- getDirectoryList newdir
                 let newSortedList = sortDirectoryList newlist
-                display' w newSortedList index' scroll' True
+                display' w newSortedList index' scroll' lastSearch True
 
             KeyChar 'o' -> do
                 openWith w (viewableList) index scroll ""
                 let newSortedList = sortDirectoryList fpath
-                display' w newSortedList index scroll True
+                display' w newSortedList index scroll lastSearch True
 
-            _   -> display' w fpath index scroll True
+            _   -> display' w fpath index scroll lastSearch True
     else return()
 
 main = do
@@ -335,7 +345,7 @@ main = do
     dir <- getCurrentDirectory
     list <- getDirectoryList dir
     let sortedList = sortDirectoryList list
-    display' w sortedList 0 0 True
+    display' w sortedList 0 0 "" True
 --    display w 0 0 True
     endWin
     system "clear"

@@ -8,6 +8,7 @@ module CommanderGeneral
   , truncateFile
   , lastChar
   , findPattern
+  , getListFromPattern
   , fileChar
 ) where
 
@@ -31,6 +32,11 @@ prompt :: String -> IO()
 prompt s = do
     putStr s
     hFlush stdout
+
+getListFromPattern :: [String] -> String -> [Int]
+getListFromPattern list pattern =
+    let sufs = map (take (length pattern)) list
+    in [x | x <- [0,1..(length list - 1)], pattern == sufs !! x]
 
 findPattern :: [String] -> String -> Int
 findPattern list pattern = 
@@ -93,7 +99,6 @@ sortDirectoryList list =
                 let smaller = sort $ filter (< x) xs
                     greater = sort $ removeCommons xs smaller
                     in smaller ++ [x] ++ greater
-
 
 getDirectoryList :: FilePath -> IO [FilePath]
 getDirectoryList path = do
