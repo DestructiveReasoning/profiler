@@ -176,8 +176,8 @@ calculateIndexScroll' list height index =
             else if index < (len + 3 - height) then index - scrollThreshold
             else len + 3 - height
 
-search :: Window -> Int -> Int -> Int -> [FilePath] -> String -> Bool -> IO()
-search w x i s dir "" prompt = do
+search :: Window -> Int -> Int -> Int -> [FilePath] -> String -> Bool -> Bool -> IO()
+search w x i s dir "" forward prompt = do
     (y,_) <- scrSize
     wMove w (y - 1) x 
     wAttrSet w (attr0,colorYellow)
@@ -189,14 +189,15 @@ search w x i s dir "" prompt = do
         c <- getCh
         case c of
             KeyChar '\n' -> do wclear w; display' w dir i s "" True
-            KeyChar q -> if q `elem` fileChar then search w x i s dir ("/" ++ [q]) True else search w x i s dir "" True
-            _ -> search w x i s dir "" True
+            KeyChar q -> if q `elem` fileChar then search w x i s dir ("/" ++ [q]) forward True else search w x i s dir "" forward True
+            _ -> search w x i s dir "" forward True
     else display' w dir i s "" True
-search w x i s dir (p:ps) prompt = do
+search w x i s dir (p:ps) forward prompt = do
     (y,_) <- scrSize 
     let index = if findPattern dir ps < (length dir) then findPattern dir ps else (length dir - 1)
-        indices = getListFromPattern dir ps
-        nextIndices = if (length indices == 0) then [i] else if (last indices) <= i + s then indices else dropWhile (<= i + s) indices
+        indices = if forward then getListFromPattern dir ps else reverse $ getListFromPattern dir ps
+        nextIndices =   if forward then if (length indices == 0) then [i] else if (last indices) <= i + s then indices else dropWhile (<= i + s) indices
+                        else if (length indices == 0) then [i] else if (last indices) >= i + s then indices else dropWhile (>= i + s) indices
         index' = head nextIndices
         scroll = calculateIndexScroll' dir y index'
 --    let (index,scroll) = calculateIndexScroll dir y index
@@ -210,10 +211,10 @@ search w x i s dir (p:ps) prompt = do
     if prompt then do
         c <- getCh
         case c of
-            KeyChar '\b' -> if (length (p:ps)) > 1 then search w x (index - scroll) scroll dir (p:(init ps)) True else search w x 0 0 dir "" True
+            KeyChar '\b' -> if (length (p:ps)) > 1 then search w x (index - scroll) scroll dir (p:(init ps)) forward True else search w x 0 0 dir "" forward True
             KeyChar '\n' -> do wclear w; display' w dir (index - scroll) scroll (p:ps) True
-            KeyChar q -> if q `elem` fileChar then search w x (index - scroll) scroll dir ((p:ps) ++ [q]) True else search w x i s dir (p:ps) True
-            _ -> search w x (index - scroll) scroll dir (p:ps) True
+            KeyChar q -> if q `elem` fileChar then search w x (index - scroll) scroll dir ((p:ps) ++ [q]) forward True else search w x i s dir (p:ps) forward True
+            _ -> search w x (index - scroll) scroll dir (p:ps) forward True
     else display' w dir (index' - scroll) scroll (p:ps) True
 
 display :: Window -> Int -> Int -> Bool -> IO()
@@ -258,7 +259,7 @@ display w index scroll prompt= do
                 (index',scroll') <- openFile' w viewableList index scroll True
                 display w index 0 True
             KeyChar '/' -> do
-                search w 0 index scroll sortedList "" True
+                search w 0 index scroll sortedList "" True True
                 
             --Return key
             KeyChar '\n' -> do --Open file, waiting for process to terminate
@@ -314,9 +315,11 @@ display' w fpath index scroll lastSearch prompt= do
                 display' w newSortedList index' scroll' lastSearch True
             KeyChar '0' -> display' w fpath 0 0 lastSearch True
             KeyChar '/' -> do
-                search w 0 index scroll fpath "" True
+                search w 0 index scroll fpath "" True True
             KeyChar 'n' -> do
-                search w 0 (index) scroll fpath lastSearch False
+                search w 0 (index) scroll fpath lastSearch True False
+            KeyChar 'N' -> do
+                search w 0 (index) scroll fpath lastSearch False False
                 
             --Return key
             KeyChar '\n' -> do --Open file, waiting for process to terminate
