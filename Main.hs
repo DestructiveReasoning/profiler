@@ -7,8 +7,8 @@ import UI.HSCurses.CursesHelper
 import qualified Dispatch as Dispatch
 
 -- TODO LIST
--- mv, cp, rm
 -- Figure out multiple windows
+-- Visual Mode
 -- Optimization
 -- Try scrolling without bounds using diplay'
 -- Fix nohup hack
@@ -92,6 +92,54 @@ printDirectoryList' w (p:ps) index = do
     (y,_) <- getYX w
     mvWAddStr w (y + 1) 0 p 
     return()
+
+mv :: Window -> Int -> Int -> FilePath -> FilePath -> Bool -> IO()
+mv w index scroll file newPath copy = do
+    (y,_) <- scrSize
+    dir <- getCurrentDirectory
+    home <- getHomeDirectory
+    wclear w 
+    display w index scroll False
+    wMove w (y - 1) 0 
+    if copy then wAddStr w $ "Copy to: " ++ newPath
+    else wAddStr w $ "Move to: " ++ newPath
+    display w index scroll False
+    refresh
+    c <- getCh
+    case c of
+        KeyChar '\b' ->
+            if (length newPath < 1) then mv w index scroll file "" copy
+            else mv w index scroll file (init newPath) copy
+        KeyChar '\n' -> do
+            let newPath' =  if (head newPath == '~') then (home ++ "/" ++ (tail newPath))
+                            else if (head newPath == '/') then newPath
+                            else dir ++ "/" ++ newPath
+            if copy then system $ "cp " ++ dir ++ "/" ++ file ++ " " ++ newPath' 
+            else system $ "mv " ++ dir ++ "/" ++ file ++ " " ++ newPath'
+            wclear w
+            refresh
+            return()
+        KeyChar q ->
+            if q `elem` fileChar then mv w index scroll file (newPath ++ [q]) copy
+            else mv w index scroll file newPath copy
+        _ -> mv w index scroll file newPath copy
+
+rm :: Window -> Int -> Int -> FilePath -> IO ()
+rm w index scroll file = do
+    (y,_) <- scrSize
+    dir <- getCurrentDirectory
+    wclear w 
+    display w index scroll False
+    wMove w (y - 1) 0
+    wAddStr w $ "Remove " ++ file ++ "? [y/N]"
+    refresh
+    c <- getCh
+    case c of 
+        KeyChar 'y' -> do
+            system $ "rm " ++ dir ++ "/" ++ file
+            wclear w
+            return()
+        _ -> do wclear w; return()
 
 openWith :: Window -> [FilePath] -> Int -> Int -> String -> IO ()
 openWith w filepath index scroll prog = do
@@ -334,6 +382,24 @@ display' w fpath index scroll lastSearch prompt= do
                 let newSortedList = sortDirectoryList fpath
                 display' w newSortedList index scroll lastSearch True
 
+            KeyChar 'S' -> do
+                mv w index scroll (viewableList !! index) "" False
+                newdir <- getCurrentDirectory
+                newlist <- getDirectoryList newdir
+                let newSortedList = sortDirectoryList newlist
+                display' w newSortedList index scroll lastSearch True
+            KeyChar 'y' -> do
+                mv w index scroll (viewableList !! index) "" True
+                newdir <- getCurrentDirectory
+                newlist <- getDirectoryList newdir
+                let newSortedList = sortDirectoryList newlist
+                display' w newSortedList index scroll lastSearch True
+            KeyChar 'd' -> do
+                rm w index scroll (viewableList !! index) 
+                newdir <- getCurrentDirectory
+                newlist <- getDirectoryList newdir
+                let newSortedList = sortDirectoryList newlist
+                display' w newSortedList index scroll lastSearch True
             _   -> display' w fpath index scroll lastSearch True
     else return()
 
