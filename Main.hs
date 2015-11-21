@@ -9,18 +9,20 @@ import qualified Dispatch as Dispatch
 -- TODO LIST
 -- Figure out multiple windows
 -- Visual Mode
+-- Copy/Paste
 -- Optimization
 -- Try scrolling without bounds using diplay'
 -- Fix nohup hack
--- Give open with capability to spawn terminal applications
--- Test out next in search function
+-- Give openWith capability to spawn terminal applications
 -- Search for patterns in middle of file name?
--- Show command "history" after closing, rather than clearing. --> Close like ranger. (Possibly forkProcess from System.Posix.Process?)
 -- Give user option to use Dispatch rather than xdg-open
 -- Search Todo
 
 -- ERRORS TO FIX
+-- Fix search automatic cycling (right now there's unwanted cycling while typing)
 -- Fix performance in color-unfriendly terminals
+-- Test out next in search function
+-- Fix command history upon close. 
 
 -- ATTRIBUTES
 selected = convertAttributes [Reverse,Bold]
@@ -114,8 +116,9 @@ mv w index scroll file newPath copy = do
             let newPath' =  if (head newPath == '~') then (home ++ "/" ++ (tail newPath))
                             else if (head newPath == '/') then newPath
                             else dir ++ "/" ++ newPath
-            if copy then system $ "cp " ++ dir ++ "/" ++ file ++ " " ++ newPath' 
-            else system $ "mv " ++ dir ++ "/" ++ file ++ " " ++ newPath'
+                finalPath = makeProperDirectory newPath'
+            if copy then system $ "cp " ++ (makeProperDirectory dir) ++ "/" ++ file ++ " " ++ finalPath
+            else system $ "mv " ++ (makeProperDirectory dir) ++ "/" ++ file ++ " " ++ finalPath
             wclear w
             refresh
             return()
@@ -136,7 +139,7 @@ rm w index scroll file = do
     c <- getCh
     case c of 
         KeyChar 'y' -> do
-            system $ "rm " ++ dir ++ "/" ++ file
+            system $ "rm " ++ (makeProperDirectory dir) ++ "/" ++ file
             wclear w
             return()
         _ -> do wclear w; return()
@@ -171,7 +174,7 @@ openWith w filepath index scroll prog = do
                 else if res == Nothing then openWith w filepath index scroll ("not found: " ++ prog)
                 else do
                     handle <- spawnProcess "nohup" [prog,(filepath !! index)]
-                    system $ "rm " ++ dir' ++ "/nohup.out"
+                    system $ "rm " ++ (makeProperDirectory dir') ++ "/nohup.out"
                     wclear w
                     refresh
                     return()
@@ -185,7 +188,7 @@ openFile' _ [] index scroll _ = return (index,scroll)
 openFile' win list index scroll decouple = do
     dir <- getCurrentDirectory
     -- Formatting filepath to be parsed by the system command on line 109.
-    let dir' = ((formatDirectory ' ' "\\ ") . (formatDirectory '\'' "\\'")) dir
+    let dir' = makeProperDirectory dir
     if (last (list !! index) == '/') then do
         cd (init (list !! index))
         return (0,0)
@@ -220,7 +223,7 @@ calculateIndexScroll' :: [FilePath] -> Int -> Int -> Int
 calculateIndexScroll' list height index =
     let scrollThreshold = height `div` 2
         len = length list
-        in  if index <= scrollThreshold then 0
+        in  if index <= scrollThreshold || len < height then 0
             else if index < (len + 3 - height) then index - scrollThreshold
             else len + 3 - height
 
@@ -396,10 +399,26 @@ display' w fpath index scroll lastSearch prompt= do
                 display' w newSortedList index scroll lastSearch True
             KeyChar 'd' -> do
                 rm w index scroll (viewableList !! index) 
+--                let index' = if (index + scroll) >= (length fpath) - 1 then (length fpath) - 1 else index
                 newdir <- getCurrentDirectory
                 newlist <- getDirectoryList newdir
                 let newSortedList = sortDirectoryList newlist
-                display' w newSortedList index scroll lastSearch True
+                    scroll' = calculateIndexScroll' newSortedList y (index + scroll)
+                    index' = 
+                        if (index + scroll') >= (length newSortedList) - 1 then (length newSortedList) - 1
+                        else index
+                display' w newSortedList index' scroll' lastSearch True
+            KeyChar '^' -> do
+                home <- getHomeDirectory
+                cd home
+                newdir <- getCurrentDirectory
+                newlist <- getDirectoryList newdir
+                let newSortedList = sortDirectoryList newlist
+                display' w newSortedList 0 0 lastSearch True
+            KeyChar 'G' -> do
+                let index' = (length fpath - 1)
+                    scroll' = calculateIndexScroll' fpath y index'
+                display' w fpath ((length viewableList) - 1) (len + 3 - y) lastSearch True
             _   -> display' w fpath index scroll lastSearch True
     else return()
 
@@ -417,4 +436,4 @@ main = do
     display' w sortedList 0 0 "" True
 --    display w 0 0 True
     endWin
-    system "clear"
+--    system "clear"

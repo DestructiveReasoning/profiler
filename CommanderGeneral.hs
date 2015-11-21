@@ -10,6 +10,7 @@ module CommanderGeneral
   , findPattern
   , getListFromPattern
   , fileChar
+  , makeProperDirectory
 ) where
 
 import Control.Monad
@@ -56,6 +57,20 @@ truncateFile len file = if (length file <= len) then file
 formatDirectory :: Char -> String -> FilePath -> FilePath
 formatDirectory _ _ [] = []
 formatDirectory x y (s:ss) = if s == x then (y ++ (formatDirectory x y ss)) else s:(formatDirectory x y ss)
+
+makeProperDirectory :: FilePath -> FilePath
+makeProperDirectory [] = []
+makeProperDirectory (x:xs) =
+    if x == ' ' then ['\\'] ++ [' ']  ++ (makeProperDirectory xs)
+    else if x == '\'' then "\\'" ++ (makeProperDirectory xs)
+    else if x == '[' then "\\[" ++ (makeProperDirectory xs)
+    else if x == ']' then "\\]" ++ (makeProperDirectory xs)
+    else [x] ++ (makeProperDirectory xs)
+
+--makeProperDirectory :: FilePath -> FilePath
+--makeProperDirectory xs = 
+--    if '\'' `elem` xs || ' ' `elem` xs then ['\"'] ++ xs ++ ['\"']
+--    else xs
 
 ls :: FilePath -> IO()
 ls path = do
