@@ -2,27 +2,32 @@ import CommanderGeneral
 import System.Directory
 import System.Exit
 import System.Process
+import System.Posix.Process
 import UI.HSCurses.Curses
 import UI.HSCurses.CursesHelper
 import qualified Dispatch as Dispatch
 
--- TODO LIST
--- Figure out multiple windows
--- Visual Mode
--- Copy/Paste
--- Optimization
--- Try scrolling without bounds using diplay'
--- Fix nohup hack
--- Give openWith capability to spawn terminal applications
--- Search for patterns in middle of file name?
--- Give user option to use Dispatch rather than xdg-open
+-- TODO LIST                                                STATUS
+-- User-defined color schemes                               Not started
+-- mkdir                                                    Similar to mv
+-- Visual Mode                                              Not started
+-- Copy/Paste                                               Not started
+-- Optimization                                             Some attempts
+-- Try scrolling without bounds using diplay'               ?
+-- Fix nohup hack                                           Try using makeProperDirectory
+-- Give openWith capability to spawn terminal applications  Not started
+-- Search for patterns in middle of file name?              Not started
+-- Give user option to use Dispatch rather than xdg-open    Already done, needs to be implemented
+-- Different colors for inactive panel                      Not started
 -- Search Todo
 
 -- ERRORS TO FIX
--- Fix search automatic cycling (right now there's unwanted cycling while typing)
--- Fix performance in color-unfriendly terminals
--- Test out next in search function
--- Fix command history upon close. 
+-- Secondary panel vanishing at start                       Not started
+-- Resizing terminal                                        Not started
+-- Fix performance in color-unfriendly terminals            Not started
+-- Test out next in search function                         So far so good
+-- Fix command history upon close.                          Mostly working, sometimes buggy.
+-- Fix reapparition of cursor after opening CLI program     Not started
 
 -- ATTRIBUTES
 selected = convertAttributes [Reverse,Bold]
@@ -51,6 +56,29 @@ color179 = Pair 5
 colorGreen = Pair 5
 colorMagenta = Pair 3
 
+marginSize :: Int
+marginSize = 2
+
+run :: Window -> Window -> Int -> Int -> Int -> Int -> IO()
+run w1 w2 i1 s1 i2 s2 = do
+    dir <- getCurrentDirectory
+    list <- getDirectoryList dir
+    let sortedList = sortDirectoryList list
+    dir2 <- display w2 i2 s2 False
+    (index1, scroll1, dir1, quit) <- (display' w1 sortedList i1 s1 "" True)
+    cycle w2 w1 i2 s2 index1 scroll1 dir2 dir1 quit
+    where   cycle win1 win2 index1 scroll1 index2 scroll2 d1 d2 q = do
+                if q then return()
+                else do
+                    cd d2
+                    display win2 index2 scroll2 False
+                    cd d1
+                    dir' <- getCurrentDirectory
+                    list' <- getDirectoryList dir'
+                    let sortedList' = sortDirectoryList list'
+                    (i1,s1,dir1,quit) <- display' win1 sortedList' index1 scroll1  "" True
+                    cycle win2 win1 index2 scroll2 i1 s1 d2 dir1 quit
+
 spaces :: Int -> [Char]
 spaces 0 = []
 spaces x = ' ':(spaces (x - 1))
@@ -60,7 +88,7 @@ printUnselected  _ [] = return()
 printUnselected w (p:ps) = do
     (y,x) <- getYX w
     if lastChar p == '/' then wAttrSet w (folder, colorBlue) else wAttrSet w (attr0, (Pair 0))
-    mvWAddStr w (y + 1) 0 p
+    mvWAddStr w (y + 1) 1 p
     wAttrSet w (attr0, (Pair 0))
     printUnselected w ps
 
@@ -68,7 +96,7 @@ printSelected :: Window -> FilePath -> IO()
 printSelected w fp = do
     (y,_) <- getYX w
     wAttrSet w (selected, colorBlue) 
-    mvWAddStr w (y + 1) 0 fp
+    mvWAddStr w (y + 1) 1 fp
     wAttrSet w (attr0, (Pair 0))
     return()
 
@@ -76,7 +104,7 @@ printDirectoryList :: Window -> [FilePath] -> Int -> IO()
 printDirectoryList _ [] _ = return()
 printDirectoryList w pps index = do
     (_,x) <- scrSize
-    let width = x `div` 3
+    let width = x `div` 2 - 2 - marginSize
     let formattedList = map ((\s -> if (length s) < width then s ++ (spaces (width - (length s))) else s) . (truncateFile width)) pps
     -- Extract selected item from list
     let reg1 = take index formattedList       --Set of items before the selected item 
@@ -97,16 +125,17 @@ printDirectoryList' w (p:ps) index = do
 
 mv :: Window -> Int -> Int -> FilePath -> FilePath -> Bool -> IO()
 mv w index scroll file newPath copy = do
-    (y,_) <- scrSize
+    (totaly,_) <- scrSize
+    let y = totaly - marginSize
     dir <- getCurrentDirectory
     home <- getHomeDirectory
     wclear w 
     display w index scroll False
-    wMove w (y - 1) 0 
+    wMove w (y - 2) (1) 
     if copy then wAddStr w $ "Copy to: " ++ newPath
     else wAddStr w $ "Move to: " ++ newPath
     display w index scroll False
-    refresh
+    wRefresh w
     c <- getCh
     case c of
         KeyChar '\b' ->
@@ -114,13 +143,14 @@ mv w index scroll file newPath copy = do
             else mv w index scroll file (init newPath) copy
         KeyChar '\n' -> do
             let newPath' =  if (head newPath == '~') then (home ++ "/" ++ (tail newPath))
+                            else if (length newPath) < 2 then file
                             else if (head newPath == '/') then newPath
                             else dir ++ "/" ++ newPath
                 finalPath = makeProperDirectory newPath'
             if copy then system $ "cp " ++ (makeProperDirectory dir) ++ "/" ++ file ++ " " ++ finalPath
             else system $ "mv " ++ (makeProperDirectory dir) ++ "/" ++ file ++ " " ++ finalPath
             wclear w
-            refresh
+            wRefresh w
             return()
         KeyChar q ->
             if q `elem` fileChar then mv w index scroll file (newPath ++ [q]) copy
@@ -129,13 +159,14 @@ mv w index scroll file newPath copy = do
 
 rm :: Window -> Int -> Int -> FilePath -> IO ()
 rm w index scroll file = do
-    (y,_) <- scrSize
+    (totaly,_) <- scrSize
+    let y = totaly - marginSize
     dir <- getCurrentDirectory
     wclear w 
     display w index scroll False
-    wMove w (y - 1) 0
+    wMove w (y - 2) (1)
     wAddStr w $ "Remove " ++ file ++ "? [y/N]"
-    refresh
+    wRefresh w
     c <- getCh
     case c of 
         KeyChar 'y' -> do
@@ -146,11 +177,12 @@ rm w index scroll file = do
 
 openWith :: Window -> [FilePath] -> Int -> Int -> String -> IO ()
 openWith w filepath index scroll prog = do
-    (y,_) <- scrSize
+    (totaly,_) <- scrSize
+    let y = totaly - marginSize
     dir' <- getCurrentDirectory
     wclear w
     display w index scroll False
-    wMove w (y - 1) 0
+    wMove w (y - 2) (1)
     wAttrSet w (attr0,colorYellow)
     if(findPattern [prog] "not found" == 0) then do 
         let prog' = "" 
@@ -162,7 +194,7 @@ openWith w filepath index scroll prog = do
         wAttrSet w (attr0,(Pair 0))
         display w index scroll False
         res <- findExecutable prog
-        refresh
+        wRefresh w
         c <- getCh
         case c of 
             KeyChar '\b'    ->
@@ -176,7 +208,7 @@ openWith w filepath index scroll prog = do
                     handle <- spawnProcess "nohup" [prog,(filepath !! index)]
                     system $ "rm " ++ (makeProperDirectory dir') ++ "/nohup.out"
                     wclear w
-                    refresh
+                    wRefresh w
                     return()
             KeyChar q       ->
                 if q `elem` fileChar then openWith w filepath index scroll (prog ++ [q])
@@ -198,17 +230,18 @@ openFile' win list index scroll decouple = do
             handle <- spawnProcess "nohup" ["xdg-open",file]
             system $ "rm " ++ dir' ++ "/nohup.out"
             wclear win
-            refresh
+            cursSet CursorInvisible
+            wRefresh win
             return (index,scroll)
         else do 
             callProcess "xdg-open" [file]
             wclear win
+            wRefresh win
             cursSet CursorInvisible
-            refresh
             return (index,scroll)
 --        wclear win
+        wRefresh win
         cursSet CursorInvisible
-        refresh
         return (index,scroll)
 
 calculateIndexScroll :: [FilePath] -> Int -> Int -> (Int,Int)
@@ -229,80 +262,90 @@ calculateIndexScroll' list height index =
 
 search :: Window -> Int -> Int -> Int -> [FilePath] -> String -> Bool -> Bool -> IO()
 search w x i s dir "" forward prompt = do
-    (y,_) <- scrSize
-    wMove w (y - 1) x 
+    (totaly,_) <- scrSize
+    let y = totaly - marginSize
+    wMove w (y - 2) (x + 1)
     wAttrSet w (attr0,colorYellow)
     wAddStr w "/"
     wAttrSet w (attr0,(Pair 0))
     display' w dir i s "" False
-    refresh
+    wRefresh w
     if prompt then do
         c <- getCh
         case c of
-            KeyChar '\n' -> do wclear w; display' w dir i s "" True
+            KeyChar '\n' -> do wclear w; display' w dir i s "" True; return()
             KeyChar q -> if q `elem` fileChar then search w x i s dir ("/" ++ [q]) forward True else search w x i s dir "" forward True
             _ -> search w x i s dir "" forward True
-    else display' w dir i s "" True
+    else do display' w dir i s "" True; return()
 search w x i s dir (p:ps) forward prompt = do
-    (y,_) <- scrSize 
+    (totaly,_) <- scrSize 
+    let y = totaly - marginSize
     let index = if findPattern dir ps < (length dir) then findPattern dir ps else (length dir - 1)
         indices = if forward then getListFromPattern dir ps else reverse $ getListFromPattern dir ps
-        nextIndices =   if forward then if (length indices == 0) then [i] else if (last indices) <= i + s then indices else dropWhile (<= i + s) indices
-                        else if (length indices == 0) then [i] else if (last indices) >= i + s then indices else dropWhile (>= i + s) indices
+        nextIndices =   if not prompt then 
+                            if forward then if (length indices == 0) then [i] else if (last indices) <= i + s then indices else dropWhile (<= i + s) indices
+                            else if (length indices == 0) then [i] else if (last indices) >= i + s then indices else dropWhile (>= i + s) indices
+                        else  
+                            if forward then if (length indices == 0) then [i] else if (last indices) < i + s then indices else dropWhile (< i + s) indices
+                            else if (length indices == 0) then [i] else if (last indices) > i + s then indices else dropWhile (> i + s) indices
         index' = head nextIndices
         scroll = calculateIndexScroll' dir y index'
 --    let (index,scroll) = calculateIndexScroll dir y index
     wclear w
     display' w dir (index' -scroll) scroll "" False
-    wMove w (y-1) x
+    wMove w (y-2) (x + 1)
     wAttrSet w (attr0,colorYellow)
     wAddStr w (p:ps)
     wAttrSet w (attr0,(Pair 0))
-    refresh
+    wRefresh w
     if prompt then do
         c <- getCh
         case c of
             KeyChar '\b' -> if (length (p:ps)) > 1 then search w x (index - scroll) scroll dir (p:(init ps)) forward True else search w x 0 0 dir "" forward True
-            KeyChar '\n' -> do wclear w; display' w dir (index - scroll) scroll (p:ps) True
+            KeyChar '\n' -> do wclear w; display' w dir (index - scroll) scroll (p:ps) True; return()
             KeyChar q -> if q `elem` fileChar then search w x (index - scroll) scroll dir ((p:ps) ++ [q]) forward True else search w x i s dir (p:ps) forward True
             _ -> search w x (index - scroll) scroll dir (p:ps) forward True
-    else display' w dir (index' - scroll) scroll (p:ps) True
+    else do display' w dir (index' - scroll) scroll (p:ps) True; return()
 
-display :: Window -> Int -> Int -> Bool -> IO()
+display :: Window -> Int -> Int -> Bool -> IO FilePath
 display w index scroll prompt= do
-    (y,_) <- scrSize
+    cursSet CursorInvisible
+    (totaly,_) <- scrSize
+    let y = totaly - marginSize - 1
     let scrollThreshold = y `div` 2
-    wMove w 0 0 
+    wMove w (marginSize - 1) 1 
     dir <- getCurrentDirectory
     wAttrSet w (folder, colorYellow);
     wAddStr w dir
     wAttrSet w (attr0,(Pair 0))
-    wMove w 1 0
+    wMove w (marginSize) 0
     list <- getDirectoryList dir
     -- TODO move this code into input parsing to eliminate sorting every frame
     let sortedList = sortDirectoryList list
         len = length sortedList
-        viewableList = take (y - 3) $ drop scroll sortedList
+        viewableList = take (y - 4) $ drop scroll sortedList
     printDirectoryList w viewableList index
-    wMove w 0 60
-    refresh
+--    wAttrSet w (folder, colorYellow);
+--    wBorder w defaultBorder
+--    wAttrSet w (attr0, (Pair 0));
+    wRefresh w
     if prompt then do
         wclear w
         c <- getCh
         case c of 
-            KeyChar 'q' -> return ()
+            KeyChar 'q' -> return dir
             KeyChar 'h' -> do
                 cd ".."
                 display w 0 0 True
             KeyChar 'j' -> do
-                if ((index <= scrollThreshold || len <= (y-3)) && index < ((length viewableList) - 1) && scroll == 0) then display w (index + 1) 0 True
-                else if ((index <= scrollThreshold || len <= (y-3)) && scroll == 0) then display w (index) 0 True
-                else if (scroll < len + 3 - y) then display w index (scroll + 1) True
-                else if (index < (length viewableList) - 1) then display w (index + 1) (len + 3 - y) True
+                if ((index <= scrollThreshold || len <= (y-4)) && index < ((length viewableList) - 1) && scroll == 0) then display w (index + 1) 0 True
+                else if ((index <= scrollThreshold || len <= (y-4)) && scroll == 0) then display w (index) 0 True
+                else if (scroll < len + 4 - y) then display w index (scroll + 1) True
+                else if (index < (length viewableList) - 1) then display w (index + 1) (len + 4 - y) True
                 else display w index scroll True
             KeyChar 'k' -> do
-                if (len <= (y-3) && index > 0) then display w (index - 1) 0 True
-                else if (index > scrollThreshold + 1) then display w (index - 1) (len + 3 - y) True
+                if (len <= (y-4) && index > 0) then display w (index - 1) 0 True
+                else if (index > scrollThreshold + 1) then display w (index - 1) (len + 4 - y) True
                 else if (scroll > 0) then display w index (scroll - 1) True
                 else if index > 0 then display w (index - 1) 0 True
                 else display w index scroll True
@@ -311,35 +354,42 @@ display w index scroll prompt= do
                 display w index 0 True
             KeyChar '/' -> do
                 search w 0 index scroll sortedList "" True True
+                newdir <- getCurrentDirectory
+                return dir
                 
             --Return key
             KeyChar '\n' -> do --Open file, waiting for process to terminate
                 (index',scroll') <- openFile' w viewableList index scroll False
                 display w index 0 True
             _   -> display w index scroll True
-    else return()
+    else return dir
 
-display' :: Window -> [FilePath] -> Int -> Int -> String -> Bool -> IO()
+display' :: Window -> [FilePath] -> Int -> Int -> String -> Bool -> IO(Int,Int,FilePath,Bool)
 display' w fpath index scroll lastSearch prompt= do
-    (y,_) <- scrSize
+    cursSet CursorInvisible
+    (totaly,_) <- scrSize
+    let y = totaly - marginSize - 1
     let scrollThreshold = y `div` 2
-    wMove w 0 0 
+    wMove w (marginSize-1) 1 
     dir <- getCurrentDirectory
     wAttrSet w (folder, colorYellow);
     wAddStr w dir
     wAttrSet w (attr0,(Pair 0))
-    wMove w 1 0
+    wMove w (marginSize) 0
 --    let sortedList = sortDirectoryList list
     let len = length fpath
-        viewableList = take (y - 3) $ drop scroll fpath
+        viewableList = take (y - 4) $ drop scroll fpath
     printDirectoryList w viewableList index
-    wMove w 0 60
-    refresh
+--    wMove w 0 60
+    wAttrSet w (folder, colorYellow);
+    wBorder w defaultBorder
+    wAttrSet w (attr0,(Pair 0))
+    wRefresh w
     if prompt then do
         wclear w
         c <- getCh
         case c of 
-            KeyChar 'q' -> return ()
+            KeyChar 'q' -> return (0,0,"",True)
             KeyChar 'h' -> do
                 cd ".."
                 newdir <- getCurrentDirectory
@@ -347,14 +397,14 @@ display' w fpath index scroll lastSearch prompt= do
                 let newSortedList = sortDirectoryList newlist
                 display' w newSortedList 0 0 lastSearch True
             KeyChar 'j' -> do
-                if ((index <= scrollThreshold || len <= (y-3)) && index < ((length viewableList) - 1) && scroll == 0) then display' w fpath (index + 1) 0 lastSearch True
-                else if ((index <= scrollThreshold || len <= (y-3)) && scroll == 0) then display' w fpath (index) 0 lastSearch True
-                else if (scroll < len + 3 - y) then display' w fpath index (scroll + 1) lastSearch True
-                else if (index < (length viewableList) - 1) then display' w fpath (index + 1) (len + 3 - y) lastSearch True
+                if ((index <= scrollThreshold || len <= (y-4)) && index < ((length viewableList) - 1) && scroll == 0) then display' w fpath (index + 1) 0 lastSearch True
+                else if ((index <= scrollThreshold || len <= (y-4)) && scroll == 0) then display' w fpath (index) 0 lastSearch True
+                else if (scroll < len + 4 - y) then display' w fpath index (scroll + 1) lastSearch True
+                else if (index < (length viewableList) - 1) then display' w fpath (index + 1) (len + 4 - y) lastSearch True
                 else display' w fpath index scroll lastSearch True
             KeyChar 'k' -> do
-                if (len <= (y-3) && index > 0) then display' w fpath (index - 1) 0 lastSearch True
-                else if (index > scrollThreshold + 1) then display' w fpath (index - 1) (len + 3 - y) lastSearch True
+                if (len <= (y-4) && index > 0) then display' w fpath (index - 1) 0 lastSearch True
+                else if (index > scrollThreshold + 1) then display' w fpath (index - 1) (len + 4 - y) lastSearch True
                 else if (scroll > 0) then display' w fpath index (scroll - 1) lastSearch True
                 else if index > 0 then display' w fpath (index - 1) 0 lastSearch True
                 else display' w fpath index scroll lastSearch True
@@ -367,10 +417,16 @@ display' w fpath index scroll lastSearch prompt= do
             KeyChar '0' -> display' w fpath 0 0 lastSearch True
             KeyChar '/' -> do
                 search w 0 index scroll fpath "" True True
+                newdir <- getCurrentDirectory
+                return (index,scroll,newdir,False)
             KeyChar 'n' -> do
                 search w 0 (index) scroll fpath lastSearch True False
+                newdir <- getCurrentDirectory
+                return (index,scroll,newdir,False)
             KeyChar 'N' -> do
                 search w 0 (index) scroll fpath lastSearch False False
+                newdir <- getCurrentDirectory
+                return (index,scroll,newdir,False)
                 
             --Return key
             KeyChar '\n' -> do --Open file, waiting for process to terminate
@@ -399,7 +455,6 @@ display' w fpath index scroll lastSearch prompt= do
                 display' w newSortedList index scroll lastSearch True
             KeyChar 'd' -> do
                 rm w index scroll (viewableList !! index) 
---                let index' = if (index + scroll) >= (length fpath) - 1 then (length fpath) - 1 else index
                 newdir <- getCurrentDirectory
                 newlist <- getDirectoryList newdir
                 let newSortedList = sortDirectoryList newlist
@@ -419,8 +474,11 @@ display' w fpath index scroll lastSearch prompt= do
                 let index' = (length fpath - 1)
                     scroll' = calculateIndexScroll' fpath y index'
                 display' w fpath ((length viewableList) - 1) (len + 3 - y) lastSearch True
+            KeyChar '\t' -> do
+                newdir <- getCurrentDirectory
+                return (index,scroll,newdir,False)
             _   -> display' w fpath index scroll lastSearch True
-    else return()
+    else return(0,0,"",True)
 
 main = do
     initCurses
@@ -429,11 +487,16 @@ main = do
     cursSet CursorInvisible
     echo False
     w <- initScr
-    wMove w 20 20 
+    (y,x) <- scrSize
+--    w1 <- newWin y (x `div` 2) 0 0
+    w1 <- newWin (y - marginSize) ((x `div` 2) - marginSize) 0 marginSize
+    wRefresh w1
+    w2 <- newWin (y - marginSize) ((x `div` 2) - marginSize) 0 (x `div` 2 + marginSize)
+    update 
+    wMove w1 20 20 
     dir <- getCurrentDirectory
     list <- getDirectoryList dir
     let sortedList = sortDirectoryList list
-    display' w sortedList 0 0 "" True
---    display w 0 0 True
+--    display' w1 sortedList 0 0 "" True
+    run w1 w2 0 0 0 0 
     endWin
---    system "clear"
