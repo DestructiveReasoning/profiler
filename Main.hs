@@ -84,7 +84,7 @@ run w1 w2 i1 s1 i2 s2 = do
 --                    wRefresh win1
 --                    wRefresh win2
 --                    refresh
-                    update 
+--                    update 
                     cycle win2 win1 index2 scroll2 i1 s1 dir2 dir1 quit
 
 spaces :: Int -> [Char]
@@ -236,7 +236,8 @@ openFile' win list index scroll decouple = do
     else do
         let file = list !! index
         if decouple then do 
-            handle <- spawnProcess "nohup" ["xdg-open",(makeProperDirectory file)]
+--            handle <- spawnProcess "nohup" ["xdg-open",(makeProperDirectory file)]
+            handle <- spawnProcess "nohup" ["xdg-open",(file)]
             system $ "rm " ++ dir' ++ "/nohup.out"
             werase win
             cursSet CursorInvisible
@@ -312,7 +313,9 @@ search w x i s dir (p:ps) forward prompt = do
     if prompt then do
         c <- getCh
         case c of
+--            KeyChar '\b' -> if (length (p:ps)) > 1 then search w x (index' - scroll) scroll dir (p:(init ps)) forward True else search w x 0 0 dir "" forward True
             KeyChar '\b' -> if (length (p:ps)) > 1 then search w x (index' - scroll) scroll dir (p:(init ps)) forward True else search w x 0 0 dir "" forward True
+--            KeyBackspace -> if (length (p:ps)) > 1 then search w x (index' - scroll) scroll dir (p:(init ps)) forward True else search w x 0 0 dir "" forward True
             KeyChar '\n' -> do werase w; display' w dir (index' - scroll) scroll (p:ps) True; return()
             KeyChar q -> if q `elem` fileChar then search w x (index' - scroll) scroll dir ((p:ps) ++ [q]) forward True else search w x i s dir (p:ps) forward True
             _ -> search w x (index' - scroll) scroll dir (p:ps) forward True
