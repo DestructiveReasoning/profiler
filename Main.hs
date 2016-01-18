@@ -9,19 +9,19 @@ import qualified Dispatch as Dispatch
 
 -- TODO LIST                                                STATUS
 -- User-defined color schemes                               Not started
--- mkdir                                                    Similar to mv
 -- Visual Mode                                              Not started
 -- Copy/Paste                                               Not started
--- Optimization                                             Try reducing calls of wclear in display and display'
 -- Try scrolling without bounds using diplay'               ?
 -- Fix nohup hack                                           Try using makeProperDirectory
 -- Give openWith capability to spawn terminal applications  Not started
 -- Search for patterns in middle of file name?              Not started
 -- Give user option to use Dispatch rather than xdg-open    Already done, needs to be implemented
+-- Optimization                                             Try reducing calls of wclear in display and display'
 -- Different colors for inactive panel                      Not started
 -- Search Todo
 
 -- ERRORS TO FIX
+-- Backspace not working                                    No progress
 -- Resizing terminal                                        Not started
 -- Test resizing with a floating WM                         Not started
 -- Index shift after searching                              No progress
@@ -29,6 +29,9 @@ import qualified Dispatch as Dispatch
 -- Test out next in search function                         So far so good
 -- Fix command history upon close.                          Mostly working, sometimes buggy.
 -- Fix reapparition of cursor after opening CLI program     Tried invoking cursSet in display functions.
+
+-- DATA TYPES
+data FileManip = MV|CP|MKDIR deriving (Eq)
 
 -- ATTRIBUTES
 selected = convertAttributes [Reverse,Bold]
@@ -131,7 +134,7 @@ printDirectoryList' w (p:ps) index = do
     mvWAddStr w (y + 1) 0 p 
     return()
 
-mv :: Window -> Int -> Int -> FilePath -> FilePath -> Bool -> IO()
+mv :: Window -> Int -> Int -> FilePath -> FilePath -> FileManip -> IO()
 mv w index scroll file newPath copy = do
     (totaly,_) <- scrSize
     let y = totaly - marginSize
@@ -140,8 +143,9 @@ mv w index scroll file newPath copy = do
     werase w 
     display w index scroll False
     wMove w (y - 2) (1) 
-    if copy then wAddStr w $ "Copy to: " ++ newPath
-    else wAddStr w $ "Move to: " ++ newPath
+    if copy == CP then wAddStr w $ "Copy to: " ++ newPath
+    else if copy == MV then wAddStr w $ "Move to: " ++ newPath
+    else wAddStr w $ "Create new directory: " ++ newPath
     display w index scroll False
     wRefresh w
     c <- getCh
@@ -155,8 +159,9 @@ mv w index scroll file newPath copy = do
                             else if (head newPath == '/') then newPath
                             else dir ++ "/" ++ newPath
                 finalPath = makeProperDirectory newPath'
-            if copy then system $ "cp " ++ (makeProperDirectory dir) ++ "/" ++ file ++ " " ++ finalPath
-            else system $ "mv " ++ (makeProperDirectory dir) ++ "/" ++ file ++ " " ++ finalPath
+            if copy == CP then system $ "cp " ++ (makeProperDirectory dir) ++ "/" ++ file ++ " " ++ finalPath
+            else if copy == MV then system $ "mv " ++ (makeProperDirectory dir) ++ "/" ++ file ++ " " ++ finalPath
+            else system $ "mkdir " ++ finalPath ++ "/"
             werase w
             wnoutRefresh w
             update
@@ -315,7 +320,7 @@ search w x i s dir (p:ps) forward prompt = do
         case c of
 --            KeyChar '\b' -> if (length (p:ps)) > 1 then search w x (index' - scroll) scroll dir (p:(init ps)) forward True else search w x 0 0 dir "" forward True
             KeyChar '\b' -> if (length (p:ps)) > 1 then search w x (index' - scroll) scroll dir (p:(init ps)) forward True else search w x 0 0 dir "" forward True
---            KeyBackspace -> if (length (p:ps)) > 1 then search w x (index' - scroll) scroll dir (p:(init ps)) forward True else search w x 0 0 dir "" forward True
+            KeyF 127-> if (length (p:ps)) > 1 then search w x (index' - scroll) scroll dir (p:(init ps)) forward True else search w x 0 0 dir "" forward True
             KeyChar '\n' -> do werase w; display' w dir (index' - scroll) scroll (p:ps) True; return()
             KeyChar q -> if q `elem` fileChar then search w x (index' - scroll) scroll dir ((p:ps) ++ [q]) forward True else search w x i s dir (p:ps) forward True
             _ -> search w x (index' - scroll) scroll dir (p:ps) forward True
@@ -462,13 +467,19 @@ display' w fpath index scroll lastSearch prompt= do
                 display' w newSortedList index scroll lastSearch True
 
             KeyChar 'S' -> do
-                mv w index scroll (viewableList !! index) "" False
+                mv w index scroll (viewableList !! index) "" MV
                 newdir <- getCurrentDirectory
                 newlist <- getDirectoryList newdir
                 let newSortedList = sortDirectoryList newlist
                 display' w newSortedList index scroll lastSearch True
             KeyChar 'y' -> do
-                mv w index scroll (viewableList !! index) "" True
+                mv w index scroll (viewableList !! index) "" CP
+                newdir <- getCurrentDirectory
+                newlist <- getDirectoryList newdir
+                let newSortedList = sortDirectoryList newlist
+                display' w newSortedList index scroll lastSearch True
+            KeyChar 'O' -> do
+                mv w index scroll (viewableList !! index) "" MKDIR
                 newdir <- getCurrentDirectory
                 newlist <- getDirectoryList newdir
                 let newSortedList = sortDirectoryList newlist
