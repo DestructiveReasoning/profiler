@@ -5,9 +5,9 @@ import UI.HSCurses.CursesHelper
 
 data FileMod = MV | CP | MKDIR deriving (Eq, Show)
 
-data Activated = LeftBrowser | RightBrowser
+--data Activated = LeftBrowser | RightBrowser
 
-data Profiler = Profiler FileBrowser FileBrowser Activated
+data Profiler = Profiler FileBrowser FileBrowser
 
 -- Stores list scroll data.
 -- First parameter: index to start displaying list
@@ -15,9 +15,9 @@ data Profiler = Profiler FileBrowser FileBrowser Activated
 -- Third parameter: index within modified list that is selected
 data ScrollIndex a = ScrollIndex a a a
 
-modProfiler :: (FileBrowser -> FileBrowser) -> Profiler -> Profiler
-modProfiler f (Profiler lbrowser rbrowser LeftBrowser) = Profiler (f lbrowser) rbrowser LeftBrowser
-modProfiler f (Profiler lbrowser rbrowser RightBrowser) = Profiler lbrowser (f rbrowser) RightBrowser
+--modProfiler :: (FileBrowser -> FileBrowser) -> Profiler -> Profiler
+--modProfiler f (Profiler lbrowser rbrowser LeftBrowser) = Profiler (f lbrowser) rbrowser LeftBrowser
+--modProfiler f (Profiler lbrowser rbrowser RightBrowser) = Profiler lbrowser (f rbrowser) RightBrowser
 
 -- ATTRIBUTES
 selected = convertAttributes [Reverse, Bold]
@@ -63,17 +63,27 @@ colorMagenta = Pair 3
 wClearAttribs :: Window -> IO ()
 wClearAttribs window = wAttrSet window (attr0, Pair 0)
 
--- Calculates indices to display from list
-getDisplayListIndices :: FileBrowser -> IO (ScrollIndex Int)
-getDisplayListIndices browser = do
-    cap <- fileCapacity
-    let len         = length $ files browser
-        i           = head $ indexStack browser
-        threshold   = cap `div` 2
-    if (len <= cap) then return $ ScrollIndex 0 len i
-    else if (i < threshold) then return $ ScrollIndex 0 cap i
-    else if (i < len - threshold) then return $ ScrollIndex (i - threshold) (i + threshold) threshold
-    else return $ ScrollIndex (len - cap) len (i + cap - len)
+run :: Profiler -> IO ()
+run profiler =
+    clear profiler >> render profiler >> getCh >>= handleInput profiler
+
+handleInput :: Profiler -> Key -> IO ()
+handleInput (Profiler active passive) input = 
+    case input of
+        KeyChar '\t'    -> run (Profiler passive active)
+        _               -> return ()
+    
+drawBorder :: FileBrowser -> IO ()
+drawBorder browser = 
+    let w = window browser
+    in wAttrSet w (folder, colorYellow) >> wBorder w defaultBorder >> wClearAttribs w
+
+clear :: Profiler -> IO ()
+clear (Profiler active passive) = wclear (window active) >> wclear (window passive)
+
+render :: Profiler -> IO ()
+render (Profiler active passive) =
+    drawBorder active >> displayBrowser active >> displayBrowser passive
 
 -- Displays FileBrowser contents
 displayBrowser :: FileBrowser -> IO ()
@@ -86,6 +96,18 @@ displayBrowser browser = do
     wClearAttribs w
     wMove w marginSize 0
     showFileList browser >> wRefresh w
+
+-- Calculates indices to display from list
+getDisplayListIndices :: FileBrowser -> IO (ScrollIndex Int)
+getDisplayListIndices browser = do
+    cap <- fileCapacity
+    let len         = length $ files browser
+        i           = head $ indexStack browser
+        threshold   = cap `div` 2
+    if (len <= cap) then return $ ScrollIndex 0 len i
+    else if (i < threshold) then return $ ScrollIndex 0 cap i
+    else if (i < len - threshold) then return $ ScrollIndex (i - threshold) (i + threshold) threshold
+    else return $ ScrollIndex (len - cap) len (i + cap - len)
 
 showFileList :: FileBrowser -> IO ()
 showFileList browser = 
@@ -127,7 +149,7 @@ main = do
     list <- sortDirectoryList <$> getDirectoryList dir
     let leftPane    = FileBrowser {window=wleft, directory=dir, files=list, indexStack=[0]}
         rightPane   = FileBrowser {window=wright, directory=dir, files=list, indexStack=[0]}
-        profiler    = Profiler leftPane rightPane LeftBrowser
-    displayBrowser leftPane
-    c <- getChar
+        profiler    = Profiler leftPane rightPane
+    displayBrowser leftPane >> displayBrowser rightPane
+    run profiler
     endWin
