@@ -82,12 +82,10 @@ displayBrowser browser = do
     let w           = window browser
         wholeDir    = files browser 
     wMove w (marginSize - 1) 1
-    wAttrSet w (folder, colorYellow)
-    wAddStr w (directory browser)
+    wAttrSet w (folder, colorYellow) >> wAddStr w (directory browser)
     wClearAttribs w
     wMove w marginSize 0
-    showFileList browser
-    wRefresh w
+    showFileList browser >> wRefresh w
 
 showFileList :: FileBrowser -> IO ()
 showFileList browser = 
@@ -105,7 +103,7 @@ showFileList browser =
                         (y,_) <- getYX w
                         limit <- fileDisplayLength
                         let truncated   = truncateFileName limit file
-                            file'       = truncated ++ (spaces (limit - (length truncated)))
+                            file'       = truncated ++ (spaces (limit - (length truncated) - marginSize))
                         wAttrSet w attrib >> mvWAddStr w (y+1) 1 file' >> wClearAttribs w
 
 -- Generates string of spaces

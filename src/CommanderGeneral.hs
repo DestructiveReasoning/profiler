@@ -104,5 +104,10 @@ changeDir path browser =
         cd path
         directory' <- getCurrentDirectory
         files' <- sortDirectoryList <$> getDirectoryList directory'
-        let indexStack' = if path == ".." then tail (indexStack browser) else 0:(indexStack browser)
-        return FileBrowser { window = window browser, directory = directory', files = files', indexStack = indexStack' }
+        let stack = indexStack browser
+            indexStack' = 
+                if path == ".." then 
+                    if (length stack) < 2 then [0]
+                    else tail stack 
+                else 0:stack
+            in return FileBrowser { window = window browser, directory = directory', files = files', indexStack = indexStack' }
