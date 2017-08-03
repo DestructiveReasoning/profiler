@@ -12,6 +12,12 @@ data Activated = LeftBrowser | RightBrowser
 
 data Profiler = Profiler FileBrowser FileBrowser Activated
 
+-- Stores list scroll data.
+-- First parameter: index to start displaying list
+-- Second parameter: index to stop displaying list (exclusive)
+-- Third parameter: index within modified list that is selected
+data ScrollIndex a = ScrollIndex a a a
+
 modProfiler :: (FileBrowser -> FileBrowser) -> Profiler -> Profiler
 modProfiler f (Profiler lbrowser rbrowser LeftBrowser) = Profiler (f lbrowser) rbrowser LeftBrowser
 modProfiler f (Profiler lbrowser rbrowser RightBrowser) = Profiler lbrowser (f rbrowser) RightBrowser
@@ -19,6 +25,14 @@ modProfiler f (Profiler lbrowser rbrowser RightBrowser) = Profiler lbrowser (f r
 -- ATTRIBUTES
 selected = convertAttributes [Reverse, Bold]
 folder = convertAttributes [Bold]
+
+-- Specifies margin on windows
+marginSize :: Int
+marginSize = 2
+
+-- Returns the total amount of files that can be listed in a window
+fileCapacity :: IO Int
+fileCapacity = fst <$> scrSize >>= (\x -> pure(x - marginSize))
 
 -- COLORS
 initColors = do
@@ -44,9 +58,36 @@ color179 = Pair 5
 colorGreen = Pair 5
 colorMagenta = Pair 3
 
-marginSize :: Int
-marginSize = 2
+-- Clears formatting and color attributes of window
+wClearAttribs :: Window -> IO ()
+wClearAttribs window = wAttrSet window (attr0, Pair 0)
 
+-- Calculates indices to display from list
+getDisplayListIndices :: FileBrowser -> IO (ScrollIndex Int)
+getDisplayListIndices browser = do
+    cap <- fileCapacity
+    let len         = length $ files browser
+        i           = head $ indexStack browser
+        threshold   = cap `div` 2
+    if (len <= cap) then return $ ScrollIndex 0 len i
+    else if (i < threshold) then return $ ScrollIndex 0 cap i
+    else if (i < len - threshold) then return $ ScrollIndex (i - threshold) (i + threshold) threshold
+    else return $ ScrollIndex (len - cap) len (i + cap - len)
+
+-- Displays FileBrowser contents
+displayBrowser :: FileBrowser -> IO ()
+displayBrowser browser = do
+    cursSet CursorInvisible
+    let w           = window browser
+        wholeDir    = files browser 
+    wMove w (marginSize - 1) 1
+    wAttrSet w (folder, colorYellow)
+    wAddStr w (directory browser)
+    wClearAttribs w
+    wMove w marginSize 0
+    wRefresh w
+
+-- Generates string of spaces
 spaces :: Int -> [Char]
 spaces x = take x $ repeat ' '
 
@@ -68,5 +109,6 @@ main = do
     let leftPane    = FileBrowser {window=wleft, directory=dir, files=list, indexStack=[0]}
         rightPane   = FileBrowser {window=wright, directory=dir, files=list, indexStack=[0]}
         profiler    = Profiler leftPane rightPane LeftBrowser
-    putStrLn "Hello, Newman"
+    displayBrowser leftPane
+    c <- getChar
     endWin
