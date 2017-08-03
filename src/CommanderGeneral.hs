@@ -10,6 +10,7 @@ module CommanderGeneral
   , makeProperDirectory
   , truncateFileName
   , sortDirectoryList
+  , sliceList
   , FileBrowser (..)
 ) where
 
@@ -83,6 +84,10 @@ sortDirectoryList list =
     let dirs    = quicksort $ filter (\x -> last x == '/') list
         files   = quicksort $ filter (\x -> last x /= '/') list
         in dirs ++ files
+
+-- Get portion of list between two indices
+sliceList :: Int -> Int -> [a] -> [a]
+sliceList start end = (drop start) . (take end)
 
 -- Change working directory
 cd :: FilePath -> IO ()

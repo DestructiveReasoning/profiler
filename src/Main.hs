@@ -1,8 +1,5 @@
-import CommanderGeneral (FileBrowser (..), getDirectoryList)
-import System.Directory
-import System.Exit
-import System.Process
-import System.Posix.Process
+import CommanderGeneral
+import System.Directory (getCurrentDirectory)
 import UI.HSCurses.Curses
 import UI.HSCurses.CursesHelper
 
@@ -32,7 +29,11 @@ marginSize = 2
 
 -- Returns the total amount of files that can be listed in a window
 fileCapacity :: IO Int
-fileCapacity = fst <$> scrSize >>= (\x -> pure(x - marginSize))
+fileCapacity = fst <$> scrSize >>= (\y -> pure(y - marginSize))
+
+-- Returns total amount of characters that can be displayed in a window line
+fileDisplayLength :: IO Int
+fileDisplayLength = snd <$> scrSize >>= (\x -> pure(x `div` 2 - marginSize))
 
 -- COLORS
 initColors = do
@@ -85,7 +86,27 @@ displayBrowser browser = do
     wAddStr w (directory browser)
     wClearAttribs w
     wMove w marginSize 0
+    showFileList browser
     wRefresh w
+
+showFileList :: FileBrowser -> IO ()
+showFileList browser = 
+    getDisplayListIndices browser >>= (\(ScrollIndex s e i) -> showList i 0 (sliceList s e (files browser)))
+    where   showList _ _ [] = return ()
+            showList sel cur (x:xs) = 
+               showFile (sel == cur) x >> showList sel (cur + 1) xs
+            showFile isSelected file = 
+                let w = window browser
+                    attrib = 
+                        if (isSelected) then (selected, colorBlue)
+                        else if ((last file) == '/') then (folder, colorBlue)
+                        else (attr0, (Pair 0))
+                    in do
+                        (y,_) <- getYX w
+                        limit <- fileDisplayLength
+                        let truncated   = truncateFileName limit file
+                            file'       = truncated ++ (spaces (limit - (length truncated)))
+                        wAttrSet w attrib >> mvWAddStr w (y+1) 1 file' >> wClearAttribs w
 
 -- Generates string of spaces
 spaces :: Int -> [Char]
@@ -105,7 +126,7 @@ main = do
     wRefresh wright
     update
     dir <- getCurrentDirectory
-    list <- getDirectoryList dir
+    list <- sortDirectoryList <$> getDirectoryList dir
     let leftPane    = FileBrowser {window=wleft, directory=dir, files=list, indexStack=[0]}
         rightPane   = FileBrowser {window=wright, directory=dir, files=list, indexStack=[0]}
         profiler    = Profiler leftPane rightPane LeftBrowser
