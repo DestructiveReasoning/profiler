@@ -17,10 +17,6 @@ data Profiler = Profiler FileBrowser FileBrowser ProfilerMode
 -- Third parameter: index within modified list that is selected
 data ScrollIndex a = ScrollIndex a a a
 
---modProfiler :: (FileBrowser -> FileBrowser) -> Profiler -> Profiler
---modProfiler f (Profiler lbrowser rbrowser LeftBrowser) = Profiler (f lbrowser) rbrowser LeftBrowser
---modProfiler f (Profiler lbrowser rbrowser RightBrowser) = Profiler lbrowser (f rbrowser) RightBrowser
-
 -- ATTRIBUTES
 selected = convertAttributes [Reverse, Bold]
 folder = convertAttributes [Bold]
@@ -74,14 +70,14 @@ handleInput (Profiler active passive Normal) input =
     case input of
         KeyChar '\t'    -> run $ Profiler passive active Normal
         KeyChar 'j'     -> 
-            let (index:rest) = indexStack active
-                fileList = files active
-                index' = if (index + 1 >= length fileList) then index else index + 1
+            let (loc:rest)  = indexStack active
+                fileList    = files active
+                index'      = if (loc + 1 >= length fileList) then loc else loc + 1
             in run $ Profiler active{indexStack=(index':rest)} passive Normal
         KeyChar 'k'     -> 
-            let (index:rest) = indexStack active
-                fileList = files active
-                index' = if (index == 0) then index else index - 1
+            let (loc:rest)  = indexStack active
+                fileList    = files active
+                index'      = if (loc == 0) then loc else loc - 1
             in run $ Profiler active{indexStack=(index':rest)} passive Normal
         KeyChar 'h'     ->
             changeDir "../" active >>= (\browser -> run $ Profiler browser passive Normal)
@@ -98,7 +94,7 @@ handleInput (Profiler active passive Normal) input =
             in run $ Profiler (active{indexStack=indexStack'}) passive Normal
         KeyChar 'G'     ->
             let (x:xs)      = indexStack active
-                lastFile    = ((\x -> x - 1) . length . files) active
+                lastFile    = (\x -> x - 1) . length . files $ active
                 indexStack' = lastFile:xs
             in run $ Profiler (active{indexStack=indexStack'}) passive Normal
         KeyChar '^'     ->
@@ -140,12 +136,14 @@ getDisplayListIndices browser = do
         threshold   = cap `div` 2
     if (len <= cap) then return $ ScrollIndex 0 len i
     else if (i < threshold) then return $ ScrollIndex 0 cap i
-    else if (i < len - threshold) then return $ ScrollIndex (i - threshold) (i + threshold) threshold
+    else if (i < len - threshold) then return $ ScrollIndex (i-threshold) (i+threshold) threshold
     else return $ ScrollIndex (len - cap) len (i + cap - len)
 
 showFileList :: FileBrowser -> IO ()
 showFileList browser = 
-    getDisplayListIndices browser >>= (\(ScrollIndex s e i) -> showList i 0 (sliceList s e (files browser)))
+    let fileList = files browser
+    in getDisplayListIndices browser >>= 
+        (\(ScrollIndex s e i) -> showList i 0 (sliceList s e fileList))
     where   showList _ _ [] = return ()
             showList sel cur (x:xs) = 
                showFile (sel == cur) x >> showList sel (cur + 1) xs
@@ -158,8 +156,8 @@ showFileList browser =
                     in do
                         (y,_) <- getYX w
                         limit <- fileDisplayLength
-                        let truncated   = truncateFileName limit file
-                            file'       = truncated ++ (spaces (limit - (length truncated) - marginSize))
+                        let trunc   = truncateFileName limit file
+                            file'   = trunc ++ (spaces (limit - (length trunc) - marginSize))
                         wAttrSet w attrib >> mvWAddStr w (y+1) 1 file' >> wClearAttribs w
 
 -- Generates string of spaces
