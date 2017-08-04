@@ -3,11 +3,13 @@ import System.Directory (getCurrentDirectory)
 import UI.HSCurses.Curses
 import UI.HSCurses.CursesHelper
 
+data ProfilerMode = Normal | Search | Visual | Insert deriving (Show, Eq)
+
 data FileMod = MV | CP | MKDIR deriving (Eq, Show)
 
 --data Activated = LeftBrowser | RightBrowser
 
-data Profiler = Profiler FileBrowser FileBrowser
+data Profiler = Profiler FileBrowser FileBrowser ProfilerMode
 
 -- Stores list scroll data.
 -- First parameter: index to start displaying list
@@ -29,7 +31,7 @@ marginSize = 2
 
 -- Returns the total amount of files that can be listed in a window
 fileCapacity :: IO Int
-fileCapacity = fst <$> scrSize >>= (\y -> pure(y - marginSize))
+fileCapacity = fst <$> scrSize >>= (\y -> pure(y - 3*marginSize))
 
 -- Returns total amount of characters that can be displayed in a window line
 fileDisplayLength :: IO Int
@@ -68,21 +70,46 @@ run profiler =
     clear profiler >> render profiler >> getCh >>= handleInput profiler
 
 handleInput :: Profiler -> Key -> IO ()
-handleInput (Profiler active passive) input = 
+handleInput (Profiler active passive Normal) input = 
     case input of
-        KeyChar '\t'    -> run (Profiler passive active)
-        _               -> return ()
-    
+        KeyChar '\t'    -> run $ Profiler passive active Normal
+        KeyChar 'j'     -> 
+            let (index:rest) = indexStack active
+                fileList = files active
+                index' = if (index + 1 >= length fileList) then index else index + 1
+            in run $ Profiler active{indexStack=(index':rest)} passive Normal
+        KeyChar 'k'     -> 
+            let (index:rest) = indexStack active
+                fileList = files active
+                index' = if (index == 0) then index else index - 1
+            in run $ Profiler active{indexStack=(index':rest)} passive Normal
+        KeyChar 'h'     ->
+            changeDir "../" active >>= (\browser -> run $ Profiler browser passive Normal)
+        KeyChar 'l'     ->
+            let file = (files active) !! (head (indexStack active))
+            in  if (last file) == '/' then
+                changeDir file active >>= (\browser -> run $ Profiler browser passive Normal)
+                else run $ Profiler active passive Normal -- TODO Implement opening files
+        KeyChar 'g'     ->
+            let (x:xs)      = indexStack active
+                indexStack' = 0:xs
+            in run $ Profiler (active{indexStack=indexStack'}) passive Normal
+        KeyChar '^'     ->
+            changeDir "~/" active >>= (\browser -> run $ Profiler browser passive Normal)
+        KeyChar 'q'     -> return ()
+        _               -> run $ Profiler active passive Normal
+handleInput _ _ = return ()
+
 drawBorder :: FileBrowser -> IO ()
 drawBorder browser = 
     let w = window browser
     in wAttrSet w (folder, colorYellow) >> wBorder w defaultBorder >> wClearAttribs w
 
 clear :: Profiler -> IO ()
-clear (Profiler active passive) = wclear (window active) >> wclear (window passive)
+clear (Profiler active passive _) = wclear (window active) >> wclear (window passive)
 
 render :: Profiler -> IO ()
-render (Profiler active passive) =
+render (Profiler active passive _) =
     drawBorder active >> displayBrowser active >> displayBrowser passive
 
 -- Displays FileBrowser contents
@@ -149,7 +176,7 @@ main = do
     list <- sortDirectoryList <$> getDirectoryList dir
     let leftPane    = FileBrowser {window=wleft, directory=dir, files=list, indexStack=[0]}
         rightPane   = FileBrowser {window=wright, directory=dir, files=list, indexStack=[0]}
-        profiler    = Profiler leftPane rightPane
+        profiler    = Profiler leftPane rightPane Normal
     displayBrowser leftPane >> displayBrowser rightPane
     run profiler
     endWin
