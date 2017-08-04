@@ -28,8 +28,8 @@ Installing Profiler
 -------------------
 To install profiler, navigate to the directory of your choice and run the following commands:
 ```
-$ git clone https://github.com/DestructiveReasoning/Profiler.git
-$ cd Profiler
+$ git clone https://github.com/DestructiveReasoning/profiler.git
+$ cd profiler
 # make install
 ```
 Profiler can then be launched: `$ profiler`.
@@ -38,7 +38,7 @@ Building Profiler
 -----------------
 To build profiler, ensure that you have the dependencies outlined above, and run the following in the directory of your choice:
 ```
-$ git clone https://github.com/DestructiveReasoning/Profiler.git
-$ cd Profiler
+$ git clone https://github.com/DestructiveReasoning/profiler.git
+$ cd profiler
 $ make
 ```
