@@ -33,7 +33,7 @@ fileCapacity = fst <$> scrSize >>= (\y -> pure(y - 3*marginSize))
 
 -- Returns total amount of characters that can be displayed in a window line
 fileDisplayLength :: IO Int
-fileDisplayLength = snd <$> scrSize >>= (\x -> pure(x `div` 2 - marginSize))
+fileDisplayLength = snd <$> scrSize >>= (\x -> pure(x `div` 2 - 2*marginSize))
 
 -- COLORS
 initColors = do
@@ -86,8 +86,8 @@ handleInput (Profiler active passive Normal dispatch) input =
         KeyChar 'l'     ->
             let file = (files active) !! (head (indexStack active))
             in  if (last file) == '/' then
-                changeDir file active >>= (\browser -> run $ Profiler browser passive Normal dispatch)
-                else run $ Profiler active passive Normal dispatch-- TODO Implement opening files
+                    changeDir file active >>= (\browser -> run $ Profiler browser passive Normal dispatch)
+                else spawnFile file dispatch >> (run $ Profiler active passive Normal dispatch)
         KeyChar 'g'     ->
             let (x:xs)      = indexStack active
                 fileList    = files active
@@ -159,7 +159,7 @@ showFileList browser =
                         (y,_) <- getYX w
                         limit <- fileDisplayLength
                         let trunc   = truncateFileName limit file
-                            file'   = trunc ++ (spaces (limit - (length trunc) - marginSize))
+                            file'   = trunc ++ (spaces (limit - (length trunc)))
                         wAttrSet w attrib >> mvWAddStr w (y+1) 1 file' >> wClearAttribs w
 
 -- Generates string of spaces

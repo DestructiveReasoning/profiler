@@ -1,20 +1,42 @@
 module Dispatch
 ( 
- procedures
-,isTextFile
+ isTextFile
+,spawnFile
 ,readConfig
 ,text
 ,Dispatch
 ) where
 
+import Data.List.Split
 import Data.Maybe
 import System.Directory
 import System.IO
+import System.Process
 
 type Dispatch = [(String, [String])]
 
+spawnFile :: FilePath -> Dispatch -> IO ()
+spawnFile file dispatch = do
+    writeFile "debug" ("Opening " ++ file ++ " (extension " ++ ((last . splitOn ".") file) ++ ") with ")
+    let prog = getLauncher file dispatch
+    case prog of 
+        Nothing -> appendFile "debug" "... nevermind"
+        Just p -> do
+            appendFile "debug" p
+            createProcess (proc (p ++ file) []) >> return ()
+
+getLauncher :: FilePath -> Dispatch -> Maybe String
+getLauncher file dispatch= 
+    let ext = last . splitOn "." $ file
+    in findProg ext dispatch
+    where
+        findProg _ [] = Nothing
+        findProg extension (x:xs) = 
+            if extension == (fst x) then Just ((head . snd) x)
+            else findProg extension xs
+
 defaultApps :: Dispatch
-defaultApps = [(".pdf",["evince","firefox","mupdf"]),
+defaultApps = [("pdf",["evince","firefox","mupdf"]),
             ("png",["feh","gimp"]),
             ("jpg",["feh","gimp"]),
             ("xcf",["gimp"]),
@@ -54,8 +76,3 @@ text = [".hs",".c",".cpp",".h",".java",".hpp",".py",".js",".cs",".sh",".txt",".t
 
 isTextFile :: String -> Bool
 isTextFile ext = ext `elem` text
-
---procedures :: String -> Maybe [String]
---procedures ext = if [n | (x,n) <- dispatch, x == ext] /= [] then Just (head [n | (x,n) <- dispatch, x == ext]) else Nothing
-procedures :: String -> [String]
-procedures ext = head [n | (x,n) <- defaultApps, x == ext]
