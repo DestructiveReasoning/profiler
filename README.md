@@ -19,7 +19,8 @@ The following keys are used for navigation in **Normal Mode**:
 
 Configuration
 -------------
-###Default applications
+**Default applications**
+---
 Default applications can be specified in the `~/.profiler` file, with the following syntax:
 ```
 <file extension 1> <program 1>
