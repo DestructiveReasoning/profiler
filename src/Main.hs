@@ -92,7 +92,14 @@ handleInput (Profiler active passive Normal) input =
                 else run $ Profiler active passive Normal -- TODO Implement opening files
         KeyChar 'g'     ->
             let (x:xs)      = indexStack active
-                indexStack' = 0:xs
+                fileList    = files active
+                firstFile   = if (length fileList) < 3 then 0 else 2
+                indexStack' = firstFile:xs
+            in run $ Profiler (active{indexStack=indexStack'}) passive Normal
+        KeyChar 'G'     ->
+            let (x:xs)      = indexStack active
+                lastFile    = ((\x -> x - 1) . length . files) active
+                indexStack' = lastFile:xs
             in run $ Profiler (active{indexStack=indexStack'}) passive Normal
         KeyChar '^'     ->
             changeDir "~/" active >>= (\browser -> run $ Profiler browser passive Normal)
