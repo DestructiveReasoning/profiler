@@ -35,14 +35,14 @@ defaultApps = [(".pdf",["evince","firefox","mupdf"]),
 
 readConfig :: FilePath -> IO (Either Dispatch String)
 readConfig file =
-    (((parseLines defaultApps). lines) <$> (readFile file))
+    (((parseLines defaultApps 1). lines) <$> (readFile file))
 
-parseLines :: Dispatch -> [String] -> Either Dispatch String
-parseLines dispatch [] = Left dispatch
-parseLines dispatch (x:xs) =
+parseLines :: Dispatch -> Int -> [String] -> Either Dispatch String
+parseLines dispatch _ [] = Left dispatch
+parseLines dispatch num (x:xs) =
     let parsed = words x
-    in  if (length parsed) /= 2 then Right $ "Syntax error on line:\n" ++ x
-        else parseLines (modifyDispatch dispatch (parsed !! 0) (parsed !! 1)) xs
+    in  if (length parsed) /= 2 then Right $ "Syntax error on line " ++ (show num) ++ ":\n" ++ x
+        else parseLines (modifyDispatch dispatch (parsed !! 0) (parsed !! 1)) (num + 1) xs
 
 modifyDispatch :: Dispatch -> String -> String -> Dispatch
 modifyDispatch [] ext prog = [(ext,[prog])]
