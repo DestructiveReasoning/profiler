@@ -23,10 +23,10 @@ spawnFile file dispatch = do
         Nothing -> appendFile "debug" "... nevermind"
         Just p -> do
             appendFile "debug" p
-            createProcess (proc (p ++ file) []) >> return ()
+            createProcess (proc p [file]) >> return ()
 
 getLauncher :: FilePath -> Dispatch -> Maybe String
-getLauncher file dispatch= 
+getLauncher file dispatch = 
     let ext = last . splitOn "." $ file
     in findProg ext dispatch
     where
