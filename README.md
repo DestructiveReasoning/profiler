@@ -17,6 +17,24 @@ The following keys are used for navigation in **Normal Mode**:
 
 *Profiler is still in development. More keybindings and features are coming.*
 
+Configuration
+-------------
+###Default applications
+Default applications can be specified in the `~/.profiler` file, with the following syntax:
+```
+<file extension 1> <program 1>
+<file extension 2> <program 2>
+<file extension 3> <program 3>
+...
+```
+For example, the following is a valid `~/.profiler` file:
+```
+pdf evince
+mp4 vlc
+png feh
+doc libreoffice
+```
+
 Dependencies
 ------------
 Profiler depends on:
