@@ -1,5 +1,7 @@
 import CommanderGeneral
-import System.Directory (getCurrentDirectory)
+import Dispatch
+import System.Directory (doesFileExist, getCurrentDirectory, getHomeDirectory)
+import System.IO
 import UI.HSCurses.Curses
 import UI.HSCurses.CursesHelper
 
@@ -9,7 +11,7 @@ data FileMod = MV | CP | MKDIR deriving (Eq, Show)
 
 --data Activated = LeftBrowser | RightBrowser
 
-data Profiler = Profiler FileBrowser FileBrowser ProfilerMode
+data Profiler = Profiler FileBrowser FileBrowser ProfilerMode Dispatch
 
 -- Stores list scroll data.
 -- First parameter: index to start displaying list
@@ -66,41 +68,41 @@ run profiler =
     clear profiler >> render profiler >> getCh >>= handleInput profiler
 
 handleInput :: Profiler -> Key -> IO ()
-handleInput (Profiler active passive Normal) input = 
+handleInput (Profiler active passive Normal dispatch) input = 
     case input of
-        KeyChar '\t'    -> run $ Profiler passive active Normal
+        KeyChar '\t'    -> run $ Profiler passive active Normal dispatch
         KeyChar 'j'     -> 
             let (loc:rest)  = indexStack active
                 fileList    = files active
                 index'      = if (loc + 1 >= length fileList) then loc else loc + 1
-            in run $ Profiler active{indexStack=(index':rest)} passive Normal
+            in run $ Profiler active{indexStack=(index':rest)} passive Normal dispatch
         KeyChar 'k'     -> 
             let (loc:rest)  = indexStack active
                 fileList    = files active
                 index'      = if (loc == 0) then loc else loc - 1
-            in run $ Profiler active{indexStack=(index':rest)} passive Normal
+            in run $ Profiler active{indexStack=(index':rest)} passive Normal dispatch
         KeyChar 'h'     ->
-            changeDir "../" active >>= (\browser -> run $ Profiler browser passive Normal)
+            changeDir "../" active >>= (\browser -> run $ Profiler browser passive Normal dispatch)
         KeyChar 'l'     ->
             let file = (files active) !! (head (indexStack active))
             in  if (last file) == '/' then
-                changeDir file active >>= (\browser -> run $ Profiler browser passive Normal)
-                else run $ Profiler active passive Normal -- TODO Implement opening files
+                changeDir file active >>= (\browser -> run $ Profiler browser passive Normal dispatch)
+                else run $ Profiler active passive Normal dispatch-- TODO Implement opening files
         KeyChar 'g'     ->
             let (x:xs)      = indexStack active
                 fileList    = files active
                 firstFile   = if (length fileList) < 3 then 0 else 2
                 indexStack' = firstFile:xs
-            in run $ Profiler (active{indexStack=indexStack'}) passive Normal
+            in run $ Profiler (active{indexStack=indexStack'}) passive Normal dispatch
         KeyChar 'G'     ->
             let (x:xs)      = indexStack active
                 lastFile    = (\x -> x - 1) . length . files $ active
                 indexStack' = lastFile:xs
-            in run $ Profiler (active{indexStack=indexStack'}) passive Normal
+            in run $ Profiler (active{indexStack=indexStack'}) passive Normal dispatch
         KeyChar '^'     ->
-            changeDir "~/" active >>= (\browser -> run $ Profiler browser passive Normal)
+            changeDir "~/" active >>= (\browser -> run $ Profiler browser passive Normal dispatch)
         KeyChar 'q'     -> return ()
-        _               -> run $ Profiler active passive Normal
+        _               -> run $ Profiler active passive Normal dispatch
 handleInput _ _ = return ()
 
 drawBorder :: FileBrowser -> IO ()
@@ -109,10 +111,10 @@ drawBorder browser =
     in wAttrSet w (folder, colorYellow) >> wBorder w defaultBorder >> wClearAttribs w
 
 clear :: Profiler -> IO ()
-clear (Profiler active passive _) = wclear (window active) >> wclear (window passive)
+clear (Profiler active passive _ _) = wclear (window active) >> wclear (window passive)
 
 render :: Profiler -> IO ()
-render (Profiler active passive _) =
+render (Profiler active passive _ _) =
     drawBorder active >> displayBrowser active >> displayBrowser passive
 
 -- Displays FileBrowser contents
@@ -164,7 +166,8 @@ showFileList browser =
 spaces :: Int -> [Char]
 spaces x = take x $ repeat ' '
 
-main = do
+initProfiler :: Dispatch -> IO()
+initProfiler dispatch = do
     initCurses
     colorsSupported <- colorPairs
     if colorsSupported < 250 then initColors16 else initColors
@@ -181,7 +184,17 @@ main = do
     list <- sortDirectoryList <$> getDirectoryList dir
     let leftPane    = FileBrowser {window=wleft, directory=dir, files=list, indexStack=[0]}
         rightPane   = FileBrowser {window=wright, directory=dir, files=list, indexStack=[0]}
-        profiler    = Profiler leftPane rightPane Normal
+        profiler    = Profiler leftPane rightPane Normal dispatch
     displayBrowser leftPane >> displayBrowser rightPane
     run profiler
     endWin
+
+main = do
+    defaultFile <- (++ "/.profiler") <$> getHomeDirectory
+    exists <- doesFileExist defaultFile
+    if exists then return ()
+    else writeFile defaultFile ""
+    dispatch <- readConfig defaultFile
+    case dispatch of 
+        Left d -> initProfiler d
+        Right err -> putStrLn err
