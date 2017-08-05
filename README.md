@@ -8,13 +8,14 @@ Using Profiler
 Upon launching Profiler, you will be put in **Normal Mode**. <br />
 The following keys are used for navigation in **Normal Mode**:
 ```
-j,k:	Move down/up
-h:		Move up a directory
-l:		If a directory is selected, navigate to that directory. Else execute the selected file.
-g:		Navigate to the first file in the directory
-G:		Navigate to the last file in the directory
-^:		Navigate to the user's home directory
-Tab:	Switch frames
+j,k:  Move down/up
+h:    Move up a directory
+l:    If a directory is selected, navigate to that directory. Else execute the selected file.
+g:    Navigate to the first file in the directory
+G:    Navigate to the last file in the directory
+^:    Navigate to the user's home directory
+Tab:  Switch frames
+```
 
 *Profiler is still in development. More keybindings and features are coming.*
 
