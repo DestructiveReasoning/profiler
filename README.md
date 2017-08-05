@@ -15,6 +15,7 @@ g:    Navigate to the first file in the directory
 G:    Navigate to the last file in the directory
 ^:    Navigate to the user's home directory
 Tab:  Switch frames
+q:    Quit Profiler
 ```
 
 *Profiler is still in development. More keybindings and features are coming.*
