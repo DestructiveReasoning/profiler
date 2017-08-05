@@ -7,10 +7,12 @@ module Dispatch
 ,Dispatch
 ) where
 
+import CommanderGeneral
 import Data.List.Split
 import Data.Maybe
 import System.Directory
 import System.IO
+import System.Posix.Process
 import System.Process
 
 type Dispatch = [(String, [String])]
@@ -19,9 +21,10 @@ spawnFile :: FilePath -> Dispatch -> IO ()
 spawnFile file dispatch = do
     writeFile "debug" ("Opening " ++ file ++ " (extension " ++ ((last . splitOn ".") file) ++ ") with ")
     let prog = getLauncher file dispatch
+        file' = makeProperDirectory file
     case prog of 
         Nothing -> appendFile "debug" "... nevermind"
-        Just p -> createProcess (proc p [file]) { new_session = True } >> return ()
+        Just p -> createProcess (shell (p ++ " " ++ file')) { new_session = True } >> return ()
 
 getLauncher :: FilePath -> Dispatch -> Maybe String
 getLauncher file dispatch = 
@@ -51,11 +54,12 @@ defaultApps = [("pdf",["evince","firefox","mupdf"]),
             ("gp5",["tuxguitar"]),
             ("gp6",["tuxguitar"]),
             ("text",["vim","subl","gedit","emacs","nano"]),
+            ("md",["xterm -e vim"]),
             ("epub",["cr3"])]
 
 readConfig :: FilePath -> IO (Either Dispatch String)
 readConfig file =
-    (((parseLines defaultApps 1). lines) <$> (readFile file))
+    (((parseLines defaultApps 1) . lines) <$> (readFile file))
 
 parseLines :: Dispatch -> Int -> [String] -> Either Dispatch String
 parseLines dispatch _ [] = Left dispatch
