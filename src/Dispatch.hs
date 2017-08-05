@@ -19,11 +19,10 @@ type Dispatch = [(String, [String])]
 
 spawnFile :: FilePath -> Dispatch -> IO ()
 spawnFile file dispatch = do
-    writeFile "debug" ("Opening " ++ file ++ " (extension " ++ ((last . splitOn ".") file) ++ ") with ")
     let prog = getLauncher file dispatch
         file' = makeProperDirectory file
     case prog of 
-        Nothing -> appendFile "debug" "... nevermind"
+        Nothing -> return ()
         Just p -> createProcess (shell (p ++ " " ++ file')) { new_session = True } >> return ()
 
 getLauncher :: FilePath -> Dispatch -> Maybe String
@@ -54,7 +53,6 @@ defaultApps = [("pdf",["evince","firefox","mupdf"]),
             ("gp5",["tuxguitar"]),
             ("gp6",["tuxguitar"]),
             ("text",["vim","subl","gedit","emacs","nano"]),
-            ("md",["xterm -e vim"]),
             ("epub",["cr3"])]
 
 readConfig :: FilePath -> IO (Either Dispatch String)
@@ -64,7 +62,7 @@ readConfig file =
 parseLines :: Dispatch -> Int -> [String] -> Either Dispatch String
 parseLines dispatch _ [] = Left dispatch
 parseLines dispatch num (x:xs) =
-    let parsed = words x
+    let parsed = map (dropWhile (== ' ')) $ splitOn "," x
     in  if (length parsed) /= 2 then Right $ "Syntax error on line " ++ (show num) ++ ":\n" ++ x
         else parseLines (modifyDispatch dispatch (parsed !! 0) (parsed !! 1)) (num + 1) xs
 
@@ -72,7 +70,7 @@ modifyDispatch :: Dispatch -> String -> String -> Dispatch
 modifyDispatch [] ext prog = [(ext,[prog])]
 modifyDispatch (x:xs) ext prog = 
     if ext == (fst x) then (ext, prog:(snd x)):xs
-    else modifyDispatch xs ext prog
+    else x:(modifyDispatch xs ext prog)
 
 text = [".hs",".c",".cpp",".h",".java",".hpp",".py",".js",".cs",".sh",".txt",".tex"]
 

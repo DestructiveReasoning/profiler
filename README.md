@@ -22,17 +22,24 @@ Configuration
 ### Default Applications
 Default applications can be specified in the `~/.profiler` file, with the following syntax:
 ```
-<file extension 1> <program 1>
-<file extension 2> <program 2>
-<file extension 3> <program 3>
+<file extension 1>, <program 1>
+<file extension 2>, <program 2>
+<file extension 3>, <program 3>
 ...
 ```
 For example, the following is a valid `~/.profiler` file:
 ```
-pdf evince
-mp4 vlc
-png feh
-doc libreoffice
+pdf, evince
+mp4, vlc
+png, feh
+doc, libreoffice
+xlsx, libreoffice
+```
+Opening files with CLI/TUI programs, such as Vim, can be quite buggy when not done properly.<br>
+For such cases, it is recommended to open the file with your CLI/TUI program in *another* terminal emulator instance, as follows:<br>
+*~/.profiler*
+```
+hs, xterm -e vim
 ```
 
 Dependencies
