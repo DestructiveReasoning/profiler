@@ -87,7 +87,8 @@ handleInput (Profiler active passive Normal dispatch) input =
             let file = (files active) !! (head (indexStack active))
             in  if (last file) == '/' then
                     changeDir file active >>= (\browser -> run $ Profiler browser passive Normal dispatch)
-                else spawnFile file dispatch >> (run $ Profiler active passive Normal dispatch)
+                else do
+                    spawnFile file dispatch >> (run $ Profiler active passive Normal dispatch) >> return ()
         KeyChar 'g'     ->
             let (x:xs)      = indexStack active
                 fileList    = files active

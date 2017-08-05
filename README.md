@@ -40,6 +40,7 @@ Dependencies
 Profiler depends on:
 * ncurses
 * The HSCurses library (`# cabal install hscurses`)
+* `Data.List.Split` (`# cabal install split`)
 * Haskell's `regex-base`, which was installed in Gentoo via `# emerge dev-haskell/regex-compat`
 
 Installing Profiler

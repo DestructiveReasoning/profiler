@@ -21,9 +21,7 @@ spawnFile file dispatch = do
     let prog = getLauncher file dispatch
     case prog of 
         Nothing -> appendFile "debug" "... nevermind"
-        Just p -> do
-            appendFile "debug" p
-            createProcess (proc p [file]) >> return ()
+        Just p -> createProcess (proc p [file]) >> return ()
 
 getLauncher :: FilePath -> Dispatch -> Maybe String
 getLauncher file dispatch = 
