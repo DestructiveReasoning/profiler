@@ -103,7 +103,7 @@ handleInput (Profiler active passive Normal dispatch) input =
                 indexStack' = lastFile:xs
             in run $ Profiler (active{indexStack=indexStack'}) passive Normal dispatch
         KeyChar '^'     ->
-            changeDir "~/" active >>= (\browser -> run $ Profiler browser passive Normal dispatch)
+            changeDir "~/" active >>= (\browser -> run $ Profiler browser{indexStack=[0]} passive Normal dispatch)
         KeyChar 'q'     -> return ()
         _               -> run $ Profiler active passive Normal dispatch
 handleInput _ _ = return ()
