@@ -1,7 +1,9 @@
 import CommanderGeneral
+import Data.Maybe
 import Dispatch
 import System.Directory (doesFileExist, getCurrentDirectory, getHomeDirectory)
 import System.IO
+import System.Posix.Signals
 import UI.HSCurses.Curses
 import UI.HSCurses.CursesHelper
 
@@ -112,7 +114,7 @@ drawBorder browser =
     in wAttrSet w (folder, colorYellow) >> wBorder w defaultBorder >> wClearAttribs w
 
 clear :: Profiler -> IO ()
-clear (Profiler active passive _ _) = wclear (window active) >> wclear (window passive)
+clear (Profiler active passive _ _) = werase (window active) >> werase (window passive)
 
 render :: Profiler -> IO ()
 render (Profiler active passive _ _) =
@@ -167,6 +169,9 @@ showFileList browser =
 spaces :: Int -> [Char]
 spaces x = take x $ repeat ' '
 
+resize :: IO ()
+resize = resizeui >>= (\(y,x) -> resizeTerminal y x) >> erase >> refresh
+
 initProfiler :: Dispatch -> IO()
 initProfiler dispatch = do
     initCurses
@@ -175,6 +180,7 @@ initProfiler dispatch = do
     cursSet CursorInvisible
     echo False
     w <- initScr
+    installHandler (fromJust cursesSigWinch) (Catch resize) Nothing
     (y,x) <- scrSize
     wleft <- newWin (y - marginSize) ((x `div` 2) - marginSize) 0 marginSize
     wRefresh wleft
