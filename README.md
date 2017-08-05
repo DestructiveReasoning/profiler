@@ -46,7 +46,7 @@ Profiler depends on:
 
 Installing Profiler
 -------------------
-To install profiler, navigate to the directory of your choice and run the following commands:
+To install Profiler, navigate to the directory of your choice and run the following commands:
 ```
 $ git clone https://github.com/DestructiveReasoning/profiler.git
 $ cd profiler
@@ -56,7 +56,7 @@ Profiler can then be launched: `$ profiler`.
 
 Building Profiler
 -----------------
-To build profiler, ensure that you have the dependencies outlined above, and run the following in the directory of your choice:
+To build Profiler, ensure that you have the dependencies outlined above, and run the following in the directory of your choice:
 ```
 $ git clone https://github.com/DestructiveReasoning/profiler.git
 $ cd profiler
