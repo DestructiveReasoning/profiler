@@ -11,15 +11,19 @@ data ProfilerMode = Normal | Search | Visual | Insert deriving (Show, Eq)
 
 data FileMod = MV | CP | MKDIR deriving (Eq, Show)
 
---data Activated = LeftBrowser | RightBrowser
+data Activated = LeftBrowser | RightBrowser deriving (Eq)
 
-data Profiler = Profiler FileBrowser FileBrowser ProfilerMode Dispatch
+data Profiler = Profiler FileBrowser FileBrowser ProfilerMode Dispatch Activated
 
 -- Stores list scroll data.
 -- First parameter: index to start displaying list
 -- Second parameter: index to stop displaying list (exclusive)
 -- Third parameter: index within modified list that is selected
 data ScrollIndex a = ScrollIndex a a a
+
+switch :: Activated -> Activated
+switch LeftBrowser = RightBrowser
+switch RightBrowser = LeftBrowser
 
 -- ATTRIBUTES
 selected = convertAttributes [Reverse, Bold]
@@ -66,46 +70,53 @@ wClearAttribs :: Window -> IO ()
 wClearAttribs window = wAttrSet window (attr0, Pair 0)
 
 run :: Profiler -> IO ()
-run profiler =
-    clear profiler >> render profiler >> getCh >>= handleInput profiler
+run profiler = 
+    refreshProfiler profiler >>= (\p -> clear p >> render p >> getCh >>= handleInput p)
+
+refreshProfiler :: Profiler -> IO Profiler
+refreshProfiler (Profiler active passive mode disp ori) = do
+    wl <- createLeftWindow
+    wr <- createRightWindow
+    if ori == LeftBrowser then  pure $ Profiler active{window=wl} passive{window=wr} mode disp ori
+    else                        pure $ Profiler active{window=wr} passive{window=wl} mode disp ori
 
 handleInput :: Profiler -> Key -> IO ()
-handleInput (Profiler active passive Normal dispatch) input = 
+handleInput (Profiler active passive Normal dispatch ori) input = 
     case input of
-        KeyChar '\t'    -> run $ Profiler passive active Normal dispatch
+        KeyChar '\t'    -> run $ Profiler passive active Normal dispatch (switch ori)
         KeyChar 'j'     -> 
             let (loc:rest)  = indexStack active
                 fileList    = files active
                 index'      = if (loc + 1 >= length fileList) then loc else loc + 1
-            in run $ Profiler active{indexStack=(index':rest)} passive Normal dispatch
+            in run $ Profiler active{indexStack=(index':rest)} passive Normal dispatch ori
         KeyChar 'k'     -> 
             let (loc:rest)  = indexStack active
                 fileList    = files active
                 index'      = if (loc == 0) then loc else loc - 1
-            in run $ Profiler active{indexStack=(index':rest)} passive Normal dispatch
+            in run $ Profiler active{indexStack=(index':rest)} passive Normal dispatch ori
         KeyChar 'h'     ->
-            changeDir "../" active >>= (\browser -> run $ Profiler browser passive Normal dispatch)
+            changeDir "../" active >>= (\browser -> run $ Profiler browser passive Normal dispatch ori)
         KeyChar 'l'     ->
             let file = (files active) !! (head (indexStack active))
             in  if (last file) == '/' then
-                    changeDir file active >>= (\browser -> run $ Profiler browser passive Normal dispatch)
+                    changeDir file active >>= (\browser -> run $ Profiler browser passive Normal dispatch ori)
                 else do
-                    spawnFile file dispatch >> (run $ Profiler active passive Normal dispatch) >> return ()
+                    spawnFile file dispatch >> (run $ Profiler active passive Normal dispatch ori) >> return ()
         KeyChar 'g'     ->
             let (x:xs)      = indexStack active
                 fileList    = files active
                 firstFile   = if (length fileList) < 3 then 0 else 2
                 indexStack' = firstFile:xs
-            in run $ Profiler (active{indexStack=indexStack'}) passive Normal dispatch
+            in run $ Profiler (active{indexStack=indexStack'}) passive Normal dispatch ori
         KeyChar 'G'     ->
             let (x:xs)      = indexStack active
                 lastFile    = (\x -> x - 1) . length . files $ active
                 indexStack' = lastFile:xs
-            in run $ Profiler (active{indexStack=indexStack'}) passive Normal dispatch
+            in run $ Profiler (active{indexStack=indexStack'}) passive Normal dispatch ori
         KeyChar '^'     ->
-            changeDir "~/" active >>= (\browser -> run $ Profiler browser{indexStack=[0]} passive Normal dispatch)
+            changeDir "~/" active >>= (\browser -> run $ Profiler browser{indexStack=[0]} passive Normal dispatch ori)
         KeyChar 'q'     -> return ()
-        _               -> run $ Profiler active passive Normal dispatch
+        _               -> run $ Profiler active passive Normal dispatch ori
 handleInput _ _ = return ()
 
 drawBorder :: FileBrowser -> IO ()
@@ -114,10 +125,10 @@ drawBorder browser =
     in wAttrSet w (folder, colorYellow) >> wBorder w defaultBorder >> wClearAttribs w
 
 clear :: Profiler -> IO ()
-clear (Profiler active passive _ _) = werase (window active) >> werase (window passive)
+clear (Profiler active passive _ _ _) = werase (window active) >> werase (window passive)
 
 render :: Profiler -> IO ()
-render (Profiler active passive _ _) =
+render (Profiler active passive _ _ _) =
     drawBorder active >> displayBrowser active >> displayBrowser passive
 
 -- Displays FileBrowser contents
@@ -198,7 +209,7 @@ initProfiler dispatch = do
     list <- sortDirectoryList <$> getDirectoryList dir
     let leftPane    = FileBrowser {window=wleft, directory=dir, files=list, indexStack=[0]}
         rightPane   = FileBrowser {window=wright, directory=dir, files=list, indexStack=[0]}
-        profiler    = Profiler leftPane rightPane Normal dispatch
+        profiler    = Profiler leftPane rightPane Normal dispatch LeftBrowser
     displayBrowser leftPane >> displayBrowser rightPane
     run profiler
     endWin
