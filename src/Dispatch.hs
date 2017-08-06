@@ -27,7 +27,7 @@ spawnFile file dispatch = do
 
 getLauncher :: FilePath -> Dispatch -> Maybe String
 getLauncher file dispatch = 
-    let ext = splitOn "." $ file
+    let ext = splitOn "." . dropWhile (== '.') $  file --Only consider filename after leading dots to allow interpretation of hidden files
     in if (length ext) < 2 then findProg "text" dispatch else findProg (last ext) dispatch
     where
         findProg _ [] = Nothing
