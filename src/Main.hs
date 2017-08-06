@@ -172,6 +172,14 @@ spaces x = take x $ repeat ' '
 resize :: IO ()
 resize = resizeui >>= (\(y,x) -> resizeTerminal y x) >> erase >> refresh
 
+createLeftWindow :: IO Window
+createLeftWindow =
+    scrSize >>= (\(y,x) -> newWin (y-marginSize) ((x `div` 2) - marginSize) 0 marginSize)
+
+createRightWindow :: IO Window
+createRightWindow =
+    scrSize >>= (\(y,x) -> newWin (y-marginSize) ((x `div` 2) - marginSize) 0 (x `div` 2 + marginSize))
+
 initProfiler :: Dispatch -> IO()
 initProfiler dispatch = do
     initCurses
@@ -181,10 +189,9 @@ initProfiler dispatch = do
     echo False
     w <- initScr
     installHandler (fromJust cursesSigWinch) (Catch resize) Nothing
-    (y,x) <- scrSize
-    wleft <- newWin (y - marginSize) ((x `div` 2) - marginSize) 0 marginSize
+    wleft <- createLeftWindow
     wRefresh wleft
-    wright <- newWin (y - marginSize) ((x `div` 2) - marginSize) 0 (x `div` 2 + marginSize)
+    wright <- createRightWindow
     wRefresh wright
     update
     dir <- getCurrentDirectory
