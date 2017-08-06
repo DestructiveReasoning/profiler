@@ -11,15 +11,15 @@ data ProfilerMode = Normal | Search | Visual | Insert deriving (Show, Eq)
 
 data FileMod = MV | CP | MKDIR deriving (Eq, Show)
 
-data Activated = LeftBrowser | RightBrowser deriving (Eq)
+data Orientation = NormalOri | FlippedOri deriving (Eq)
 
 data WindowSet = WindowSet {
     active      :: FileBrowser,
     passive     :: FileBrowser,
-    orientation :: Activated
+    orientation :: Orientation
 }
 
-data Profiler = Profiler FileBrowser FileBrowser ProfilerMode Dispatch Activated
+data Profiler = Profiler WindowSet ProfilerMode Dispatch
 
 -- Stores list scroll data.
 -- First parameter: index to start displaying list
@@ -27,9 +27,12 @@ data Profiler = Profiler FileBrowser FileBrowser ProfilerMode Dispatch Activated
 -- Third parameter: index within modified list that is selected
 data ScrollIndex a = ScrollIndex a a a
 
-switch :: Activated -> Activated
-switch LeftBrowser = RightBrowser
-switch RightBrowser = LeftBrowser
+switch :: Orientation -> Orientation
+switch NormalOri = FlippedOri
+switch FlippedOri = NormalOri
+
+flipWindowSet :: WindowSet -> WindowSet
+flipWindowSet set = set{active=(passive set), passive=(active set), orientation=(switch (orientation set))}
 
 -- ATTRIBUTES
 selected = convertAttributes [Reverse, Bold]
@@ -80,49 +83,59 @@ run profiler =
     refreshProfiler profiler >>= (\p -> clear p >> render p >> getCh >>= handleInput p)
 
 refreshProfiler :: Profiler -> IO Profiler
-refreshProfiler (Profiler active passive mode disp ori) = do
+refreshProfiler (Profiler set mode disp) = do
     wl <- createLeftWindow
     wr <- createRightWindow
-    if ori == LeftBrowser then  pure $ Profiler active{window=wl} passive{window=wr} mode disp ori
-    else                        pure $ Profiler active{window=wr} passive{window=wl} mode disp ori
+    let act = active set
+        pas = passive set
+        ori = orientation set
+        set' =  if ori == NormalOri then set{active=act{window=wl}, passive=pas{window=wr}}
+                else set{active=act{window=wr}, passive=pas{window=wl}}
+    pure $ Profiler set' mode disp
 
 handleInput :: Profiler -> Key -> IO ()
-handleInput (Profiler active passive Normal dispatch ori) input = 
+handleInput (Profiler set Normal dispatch) input = 
     case input of
-        KeyChar '\t'    -> run $ Profiler passive active Normal dispatch (switch ori)
+        KeyChar '\t'    -> run $ Profiler (flipWindowSet set) Normal dispatch
         KeyChar 'j'     -> 
-            let (loc:rest)  = indexStack active
-                fileList    = files active
+            let (loc:rest)  = indexStack . active $ set
+                fileList    = files . active $ set
                 index'      = if (loc + 1 >= length fileList) then loc else loc + 1
-            in run $ Profiler active{indexStack=(index':rest)} passive Normal dispatch ori
+                browser     = (active set){indexStack=(index':rest)}
+            in run $ Profiler set{active=browser} Normal dispatch
         KeyChar 'k'     -> 
-            let (loc:rest)  = indexStack active
-                fileList    = files active
+            let (loc:rest)  = indexStack . active $ set
+                fileList    = files . active $ set
                 index'      = if (loc == 0) then loc else loc - 1
-            in run $ Profiler active{indexStack=(index':rest)} passive Normal dispatch ori
+                browser     = (active set){indexStack=(index':rest)}
+            in run $ Profiler set{active=browser} Normal dispatch
         KeyChar 'h'     ->
-            changeDir "../" active >>= (\browser -> run $ Profiler browser passive Normal dispatch ori)
+            changeDir "../" (active set) >>= (\browser -> run $ Profiler set{active=browser} Normal dispatch)
         KeyChar 'l'     ->
-            let file = (files active) !! (head (indexStack active))
+            let fileList    = files . active $ set
+                index       = head $ indexStack . active $ set
+                file        = fileList !! index
             in  if (last file) == '/' then
-                    changeDir file active >>= (\browser -> run $ Profiler browser passive Normal dispatch ori)
+                    changeDir file (active set) >>= (\browser -> run $ Profiler set{active=browser} Normal dispatch)
                 else do
-                    spawnFile file dispatch >> (run $ Profiler active passive Normal dispatch ori) >> return ()
+                    spawnFile file dispatch >> (run $ Profiler set Normal dispatch) >> return ()
         KeyChar 'g'     ->
-            let (x:xs)      = indexStack active
-                fileList    = files active
+            let (x:xs)      = indexStack . active $ set
+                fileList    = files . active $ set
                 firstFile   = if (length fileList) < 3 then 0 else 2
                 indexStack' = firstFile:xs
-            in run $ Profiler (active{indexStack=indexStack'}) passive Normal dispatch ori
+                browser     = (active set){indexStack=indexStack'}
+            in run $ Profiler set{active=browser} Normal dispatch 
         KeyChar 'G'     ->
-            let (x:xs)      = indexStack active
-                lastFile    = (\x -> x - 1) . length . files $ active
+            let (x:xs)      = indexStack . active $ set
+                lastFile    = (\x -> x - 1) . length . files . active $ set
                 indexStack' = lastFile:xs
-            in run $ Profiler (active{indexStack=indexStack'}) passive Normal dispatch ori
+                browser     = (active set){indexStack=indexStack'}
+            in run $ Profiler set{active=browser} Normal dispatch
         KeyChar '^'     ->
-            changeDir "~/" active >>= (\browser -> run $ Profiler browser{indexStack=[0]} passive Normal dispatch ori)
+            changeDir "~/" (active set) >>= (\browser -> run $ Profiler set{active=browser{indexStack=[0]}} Normal dispatch )
         KeyChar 'q'     -> return ()
-        _               -> run $ Profiler active passive Normal dispatch ori
+        _               -> run $ Profiler set Normal dispatch
 handleInput _ _ = return ()
 
 drawBorder :: FileBrowser -> IO ()
@@ -131,11 +144,11 @@ drawBorder browser =
     in wAttrSet w (folder, colorYellow) >> wBorder w defaultBorder >> wClearAttribs w
 
 clear :: Profiler -> IO ()
-clear (Profiler active passive _ _ _) = werase (window active) >> werase (window passive)
+clear (Profiler set _ _) = werase (window (active set)) >> werase (window (passive set))
 
 render :: Profiler -> IO ()
-render (Profiler active passive _ _ _) =
-    drawBorder active >> displayBrowser active >> displayBrowser passive
+render (Profiler set _ _) =
+    drawBorder (active set) >> displayBrowser (active set) >> displayBrowser (passive set)
 
 -- Displays FileBrowser contents
 displayBrowser :: FileBrowser -> IO ()
@@ -215,7 +228,8 @@ initProfiler dispatch = do
     list <- sortDirectoryList <$> getDirectoryList dir
     let leftPane    = FileBrowser {window=wleft, directory=dir, files=list, indexStack=[0]}
         rightPane   = FileBrowser {window=wright, directory=dir, files=list, indexStack=[0]}
-        profiler    = Profiler leftPane rightPane Normal dispatch LeftBrowser
+        set         = WindowSet {active=leftPane, passive=rightPane, orientation=NormalOri}
+        profiler    = Profiler set Normal dispatch
     displayBrowser leftPane >> displayBrowser rightPane
     run profiler
     endWin
