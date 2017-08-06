@@ -27,8 +27,8 @@ spawnFile file dispatch = do
 
 getLauncher :: FilePath -> Dispatch -> Maybe String
 getLauncher file dispatch = 
-    let ext = last . splitOn "." $ file
-    in findProg ext dispatch
+    let ext = splitOn "." $ file
+    in if (length ext) < 2 then findProg "text" dispatch else findProg (last ext) dispatch
     where
         findProg _ [] = Nothing
         findProg extension (x:xs) = 
@@ -52,7 +52,7 @@ defaultApps = [("pdf",["evince","firefox","mupdf"]),
             ("gp4",["tuxguitar"]),
             ("gp5",["tuxguitar"]),
             ("gp6",["tuxguitar"]),
-            ("text",["vim","subl","gedit","emacs","nano"]),
+            ("text",["xterm -e vim","subl","gedit","xterm -e emacs","xterm -e nano"]),
             ("epub",["cr3"])]
 
 readConfig :: FilePath -> IO (Either Dispatch String)

@@ -200,7 +200,7 @@ spaces :: Int -> [Char]
 spaces x = take x $ repeat ' '
 
 resize :: IO ()
-resize = resizeui >>= (\(y,x) -> resizeTerminal y x) >> erase >> refresh
+resize = resizeui >>= (\(y,x) -> resizeTerminal y x)
 
 createLeftWindow :: IO Window
 createLeftWindow =
