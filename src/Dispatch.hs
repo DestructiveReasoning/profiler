@@ -23,7 +23,7 @@ spawnFile file dispatch = do
         file' = makeProperDirectory file
     case prog of 
         Nothing -> return ()
-        Just p -> createProcess (shell (p ++ " " ++ file')) { new_session = True } >> return ()
+        Just p -> createProcess (shell (p ++ " " ++ file')) { std_out = CreatePipe, new_session = True } >> return ()
 
 getLauncher :: FilePath -> Dispatch -> Maybe String
 getLauncher file dispatch = 
