@@ -13,6 +13,12 @@ data FileMod = MV | CP | MKDIR deriving (Eq, Show)
 
 data Activated = LeftBrowser | RightBrowser deriving (Eq)
 
+data WindowSet = WindowSet {
+    active      :: FileBrowser,
+    passive     :: FileBrowser,
+    orientation :: Activated
+}
+
 data Profiler = Profiler FileBrowser FileBrowser ProfilerMode Dispatch Activated
 
 -- Stores list scroll data.
