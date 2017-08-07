@@ -116,48 +116,71 @@ reSearch (Profiler set mode dispatch search) =
 handleInput :: Profiler -> Key -> IO ()
 handleInput (Profiler set Normal dispatch search) input = 
     case input of
-        KeyChar '\t'    -> 
+        KeyChar '\t'    -> -- Switch frames
             run $ reSearch (Profiler (flipWindowSet set) Normal dispatch search)
-        KeyChar 'j'     -> 
+        KeyChar 'j'     -> -- Move down
             let (loc:rest)  = indexStack . active $ set
                 fileList    = files . active $ set
                 index'      = if (loc + 1 >= length fileList) then loc else loc + 1
                 browser     = (active set){indexStack=(index':rest)}
             in run $ Profiler set{active=browser} Normal dispatch search
-        KeyChar 'k'     -> 
+        KeyChar 'k'     ->  -- Move up
             let (loc:rest)  = indexStack . active $ set
                 fileList    = files . active $ set
                 index'      = if (loc == 0) then loc else loc - 1
                 browser     = (active set){indexStack=(index':rest)}
             in run $ Profiler set{active=browser} Normal dispatch search
-        KeyChar 'h'     ->
+        KeyChar 'h'     -> -- Go up a directory
             changeDir "../" (active set) >>= (\browser -> run $ reSearch (Profiler set{active=browser} Normal dispatch search))
-        KeyChar 'l'     ->
+        KeyChar 'l'     -> -- Open directory/file
             let fileList    = files . active $ set
                 index       = head $ indexStack . active $ set
                 file        = fileList !! index
             in  if (last file) == '/' then
                     changeDir file (active set) >>= (\browser -> run $ reSearch (Profiler set{active=browser} Normal dispatch search))
                 else do
-                    spawnFile file dispatch >> (run $ Profiler set Normal dispatch search) >> return ()
-        KeyChar 'g'     ->
+                    spawnFile file dispatch >> (run $ Profiler set Normal dispatch search)
+        KeyChar 'o'     -> -- Open file with...
+            let fileList    = files . active $ set
+                index       = head $ indexStack . active $ set
+                file        = fileList !! index
+            in 
+                if (last file) == '/' then run $ Profiler set Normal dispatch search
+                else getProg "" >>= (\p -> openWith (Just p) file dispatch >> (run $ Profiler set Normal dispatch search))
+                where
+                    getProg p = do
+                        win <- createSubWindow
+                        werase win
+                        mvWAddStr win 0 0 $ "Open with: " ++ p
+                        wRefresh win
+                        c <- getCh
+                        case c of
+                            KeyChar '\n'    -> pure p
+                            KeyChar '\b'    -> 
+                                let p' = if (length p == 0) then "" else init p
+                                in getProg $ p'
+                            KeyChar '\DEL'  ->
+                                let p' = if (length p == 0) then "" else init p
+                                in getProg $ p'
+                            KeyChar c       -> getProg $ p ++ [c]
+        KeyChar 'g'     -> -- Go to first file
             let (x:xs)      = indexStack . active $ set
                 fileList    = files . active $ set
                 firstFile   = if (length fileList) < 3 then 0 else 2
                 indexStack' = firstFile:xs
                 browser     = (active set){indexStack=indexStack'}
             in run $ Profiler set{active=browser} Normal dispatch search
-        KeyChar 'G'     ->
+        KeyChar 'G'     -> -- Go to last file
             let (x:xs)      = indexStack . active $ set
                 lastFile    = (\x -> x - 1) . length . files . active $ set
                 indexStack' = lastFile:xs
                 browser     = (active set){indexStack=indexStack'}
             in run $ Profiler set{active=browser} Normal dispatch search
-        KeyChar '^'     ->
+        KeyChar '^'     -> -- Go to home directory
             changeDir "~/" (active set) >>= (\browser -> run $ reSearch (Profiler set{active=browser{indexStack=[0]}} Normal dispatch search))
-        KeyChar '/'     ->
+        KeyChar '/'     -> -- Search
             run $ Profiler set Search dispatch (Found "" [])
-        KeyChar 'n'     ->
+        KeyChar 'n'     -> -- Cycle through search results
             case search of
                 NoResults   -> run $ Profiler set Normal dispatch search
                 Found s []  -> run $ Profiler set Normal dispatch search

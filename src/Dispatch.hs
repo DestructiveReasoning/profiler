@@ -1,6 +1,7 @@
 module Dispatch
 ( 
  isTextFile
+,openWith
 ,spawnFile
 ,readConfig
 ,text
@@ -18,12 +19,14 @@ import System.Process
 type Dispatch = [(String, [String])]
 
 spawnFile :: FilePath -> Dispatch -> IO ()
-spawnFile file dispatch = do
-    let prog = getLauncher file dispatch
-        file' = makeProperDirectory file
-    case prog of 
+spawnFile file dispatch = openWith (getLauncher file dispatch) file dispatch
+
+openWith :: Maybe String -> FilePath -> Dispatch -> IO ()
+openWith prog file dispatch = 
+    let file' = makeProperDirectory file
+    in case prog of 
         Nothing -> return ()
-        Just p -> createProcess (shell (p ++ " " ++ file')) { std_out = CreatePipe, new_session = True } >> return ()
+        Just p -> createProcess (shell (p ++ " " ++ file')) { std_out = CreatePipe, std_err = CreatePipe, new_session = True } >> return ()
 
 getLauncher :: FilePath -> Dispatch -> Maybe String
 getLauncher file dispatch = 
