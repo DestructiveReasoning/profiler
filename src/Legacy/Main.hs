@@ -5,7 +5,6 @@ import System.Process
 import System.Posix.Process
 import UI.HSCurses.Curses
 import UI.HSCurses.CursesHelper
-import qualified Dispatch as Dispatch
 
 -- TODO LIST                                                STATUS
 -- User-defined color schemes                               Not started
