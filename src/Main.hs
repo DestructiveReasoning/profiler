@@ -14,6 +14,8 @@ data FileMod = MV | CP | MKDIR deriving (Eq, Show)
 
 data Orientation = NormalOri | FlippedOri deriving (Eq)
 
+data CycleDir = Forward | Backward deriving (Eq)
+
 data WindowSet = WindowSet {
     active      :: FileBrowser,
     passive     :: FileBrowser,
@@ -102,10 +104,20 @@ refreshProfiler (Profiler set mode disp search) = do
     wRefresh win
     pure $ Profiler set' mode disp search
 
+reSearch :: Profiler -> Profiler
+reSearch (Profiler set mode dispatch search) =
+    case search of
+        NoResults   -> Profiler set mode dispatch search
+        Found x ls  ->
+            let fileList    = files . active $ set
+                Found s res = getListFromPattern fileList x
+            in Profiler set mode dispatch (Found s res)
+
 handleInput :: Profiler -> Key -> IO ()
 handleInput (Profiler set Normal dispatch search) input = 
     case input of
-        KeyChar '\t'    -> run $ Profiler (flipWindowSet set) Normal dispatch search
+        KeyChar '\t'    -> 
+            run $ reSearch (Profiler (flipWindowSet set) Normal dispatch search)
         KeyChar 'j'     -> 
             let (loc:rest)  = indexStack . active $ set
                 fileList    = files . active $ set
@@ -119,13 +131,13 @@ handleInput (Profiler set Normal dispatch search) input =
                 browser     = (active set){indexStack=(index':rest)}
             in run $ Profiler set{active=browser} Normal dispatch search
         KeyChar 'h'     ->
-            changeDir "../" (active set) >>= (\browser -> run $ Profiler set{active=browser} Normal dispatch search)
+            changeDir "../" (active set) >>= (\browser -> run $ reSearch (Profiler set{active=browser} Normal dispatch search))
         KeyChar 'l'     ->
             let fileList    = files . active $ set
                 index       = head $ indexStack . active $ set
                 file        = fileList !! index
             in  if (last file) == '/' then
-                    changeDir file (active set) >>= (\browser -> run $ Profiler set{active=browser} Normal dispatch search)
+                    changeDir file (active set) >>= (\browser -> run $ reSearch (Profiler set{active=browser} Normal dispatch search))
                 else do
                     spawnFile file dispatch >> (run $ Profiler set Normal dispatch search) >> return ()
         KeyChar 'g'     ->
@@ -142,7 +154,7 @@ handleInput (Profiler set Normal dispatch search) input =
                 browser     = (active set){indexStack=indexStack'}
             in run $ Profiler set{active=browser} Normal dispatch search
         KeyChar '^'     ->
-            changeDir "~/" (active set) >>= (\browser -> run $ Profiler set{active=browser{indexStack=[0]}} Normal dispatch search)
+            changeDir "~/" (active set) >>= (\browser -> run $ reSearch (Profiler set{active=browser{indexStack=[0]}} Normal dispatch search))
         KeyChar '/'     ->
             run $ Profiler set Search dispatch (Found "" [])
         KeyChar 'n'     ->
