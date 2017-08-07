@@ -3,9 +3,7 @@ module CommanderGeneral
     cd
   , changeDir
   , fileChar
-  , findConcretePattern
   , getDirectoryList
-  , getListFromPattern
   , quicksort
   , makeProperDirectory
   , truncateFileName
@@ -16,13 +14,11 @@ module CommanderGeneral
 
 import Control.Monad
 import Data.Char
-import Data.Maybe
 import System.Directory
 import System.Exit
 import System.FilePath
 import System.IO
 import System.Process
-import Text.Regex
 import UI.HSCurses.Curses
 import UI.HSCurses.CursesHelper
 
@@ -41,17 +37,6 @@ quicksort (x:xs) =
     let smaller = quicksort $ filter (< x) xs
         greater = quicksort $ filter (>= x) xs
         in smaller ++ [x] ++ greater
-
--- Get list of indices in file list that matches a pattern
-getListFromPattern :: [String] -> String -> [Int]
-getListFromPattern list pattern = 
-    let regex = mkRegex $ ".*" ++ pattern ++ ".*"
-    in [x | x <- [0..(length list - 1)], isJust $ matchRegex regex (list !! x)]
-
--- Get first index of list item that matches a prefix
-findConcretePattern :: [String] -> String -> Int
-findConcretePattern list pattern = 
-    length $ takeWhile (/= pattern) $ map (take (length pattern)) list
 
 truncateFileName :: Int -> FilePath -> FilePath
 truncateFileName limit file =
