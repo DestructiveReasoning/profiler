@@ -89,7 +89,7 @@ refreshProfiler :: Profiler -> IO Profiler
 refreshProfiler (Profiler set mode disp search) = do
     wl <- createLeftWindow
     wr <- createRightWindow
-    win <- createMainWindow
+    win <- createSubWindow
     let act = active set
         pas = passive set
         ori = orientation set
@@ -98,8 +98,8 @@ refreshProfiler (Profiler set mode disp search) = do
     werase win
     if mode == Search then
         case search of
-            NoResults   -> scrSize >>= (\(y,x) -> mvWAddStr win (y-1) 0 "/")
-            Found s ls  -> scrSize >>= (\(y,x) -> mvWAddStr win (y-1) 0 ("/" ++ s))
+            NoResults   -> scrSize >>= (\(y,x) -> mvWAddStr win 0 0 "/")
+            Found s ls  -> scrSize >>= (\(y,x) -> mvWAddStr win 0 0 ("/" ++ s))
     else return ()
     wRefresh win
     pure $ Profiler set' mode disp search
@@ -263,6 +263,10 @@ createRightWindow =
 createMainWindow :: IO Window
 createMainWindow = 
     scrSize >>= (\(y,x) -> newWin y x 0 0)
+
+createSubWindow :: IO Window
+createSubWindow =
+    scrSize >>= (\(y,x) -> newWin marginSize x (y - marginSize) 0)
 
 initProfiler :: Dispatch -> IO()
 initProfiler dispatch = do
