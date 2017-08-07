@@ -81,12 +81,10 @@ wClearAttribs window = wAttrSet window (attr0, Pair 0)
 
 run :: Profiler -> IO ()
 run profiler = 
-    appendFile "debug" "Got to run\n" >>
     refreshProfiler profiler >>= (\p -> clear p >> render p >> getCh >>= handleInput p)
 
 refreshProfiler :: Profiler -> IO Profiler
 refreshProfiler (Profiler set mode disp search) = do
-    appendFile "debug" "Got to refreshProfiler\n"
     wl <- createLeftWindow
     wr <- createRightWindow
     win <- createMainWindow
@@ -147,17 +145,28 @@ handleInput (Profiler set Normal dispatch search) input =
             changeDir "~/" (active set) >>= (\browser -> run $ Profiler set{active=browser{indexStack=[0]}} Normal dispatch search)
         KeyChar '/'     ->
             run $ Profiler set Search dispatch (Found "" [])
+        KeyChar 'n'     ->
+            case search of
+                NoResults   -> run $ Profiler set Normal dispatch search
+                Found s []  -> run $ Profiler set Normal dispatch search
+                Found s ls  -> 
+                    let (i:is) = indexStack . active $ set
+                        i' = if (i+1) > (last ls) then (head ls) else head $ dropWhile (< i + 1) ls
+                        indexStack' = i':is
+                        browser = (active set){indexStack=indexStack'}
+                    in run $ Profiler set{active=browser} Normal dispatch (Found s ls)
         KeyChar 'q'     -> return ()
         _               -> run $ Profiler set Normal dispatch search
 handleInput (Profiler set Search dispatch (Found x ls)) input = 
     case input of
-        KeyChar '\n'    -> writeFile "debug" "Exiting Search Mode" >> (run $ Profiler set Normal dispatch (Found x ls))
+        KeyChar '\n'    -> run $ Profiler set Normal dispatch (Found x ls)
         KeyBackspace    -> run $ Profiler set Search dispatch (Found (init x) ls)
         KeyChar c   ->
             let fileList    = files . active $ set
                 Found s res = getListFromPattern fileList (x ++ [c])
                 (i:is)      = indexStack . active $ set
-                indexStack' = if (length res > 0) then (head (dropWhile (< i) res)):is else (i:is)
+                i'          = if (length res) == 0 then i else if i > (last res) then (head res) else head $ dropWhile (< i) res
+                indexStack' = i':is
                 browser     = (active set){indexStack=indexStack'}
             in run $ Profiler set{active=browser} Search dispatch (Found s res)
         _           -> run $ Profiler set Normal dispatch (Found x [0])
