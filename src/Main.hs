@@ -172,8 +172,12 @@ handleInput (Profiler set Normal dispatch search) input =
 handleInput (Profiler set Search dispatch (Found x ls)) input = 
     case input of
         KeyChar '\n'    -> run $ Profiler set Normal dispatch (Found x ls)
-        KeyChar '\b'    -> run $ Profiler set Search dispatch (Found (init x) ls)
-        KeyBackspace    -> run $ Profiler set Search dispatch (Found (init x) ls)
+        KeyChar '\b'    -> 
+            if (length x) == 0 then run $ Profiler set Search dispatch (Found x ls)
+            else run $ Profiler set Search dispatch (Found (init x) ls)
+        KeyBackspace    -> 
+            if (length x) == 0 then run $ Profiler set Search dispatch (Found x ls)
+            else run $ Profiler set Search dispatch (Found (init x) ls)
         KeyChar c   ->
             let fileList    = files . active $ set
                 Found s res = getListFromPattern fileList (x ++ [c])
