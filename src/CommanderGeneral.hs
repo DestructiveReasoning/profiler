@@ -45,7 +45,7 @@ quicksort (x:xs) =
 -- Get list of indices in file list that matches a pattern
 getListFromPattern :: [String] -> String -> [Int]
 getListFromPattern list pattern = 
-    let regex = mkRegex $ "*" ++ pattern ++ "*"
+    let regex = mkRegex $ ".*" ++ pattern ++ ".*"
     in [x | x <- [0..(length list - 1)], isJust $ matchRegex regex (list !! x)]
 
 -- Get first index of list item that matches a prefix
