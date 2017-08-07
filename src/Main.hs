@@ -115,6 +115,7 @@ reSearch (Profiler set mode dispatch search) =
 
 handleInput :: Profiler -> Key -> IO ()
 handleInput (Profiler set Normal dispatch search) input = 
+    appendFile "debug" ((show input) ++ "\n") >>
     case input of
         KeyChar '\t'    -> 
             run $ reSearch (Profiler (flipWindowSet set) Normal dispatch search)
@@ -170,9 +171,13 @@ handleInput (Profiler set Normal dispatch search) input =
         KeyChar 'q'     -> return ()
         _               -> run $ Profiler set Normal dispatch search
 handleInput (Profiler set Search dispatch (Found x ls)) input = 
+    appendFile "debug" ((show input) ++ "\n") >>
     case input of
         KeyChar '\n'    -> run $ Profiler set Normal dispatch (Found x ls)
         KeyChar '\b'    -> 
+            if (length x) == 0 then run $ Profiler set Search dispatch (Found x ls)
+            else run $ Profiler set Search dispatch (Found (init x) ls)
+        KeyChar '\DEL'    -> 
             if (length x) == 0 then run $ Profiler set Search dispatch (Found x ls)
             else run $ Profiler set Search dispatch (Found (init x) ls)
         KeyBackspace    -> 
