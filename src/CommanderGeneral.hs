@@ -14,6 +14,7 @@ module CommanderGeneral
 
 import Control.Monad
 import Data.Char
+import Data.List.Split
 import System.Directory
 import System.Exit
 import System.FilePath
@@ -42,7 +43,13 @@ truncateFileName :: Int -> FilePath -> FilePath
 truncateFileName limit file =
     if length file <= limit then file
     else if last file == '/' then (take (limit - 3) file) ++ "~~/"
-    else (take (limit - 3) file) ++ "~~~"
+    else
+        let parts = splitOn "." file
+            extension = if (length parts) <= 1 then "" else (last parts)
+            extension' = if (length extension) <= limit then extension else [head extension]
+            rem = limit - (length extension') - 1
+        in (take (rem - 3) file) ++ "~~~." ++ extension'
+--    else (take (limit - 3) file) ++ "~~~"
 
 -- Format directory to be understood by BASH
 makeProperDirectory :: FilePath -> FilePath
