@@ -206,12 +206,18 @@ handleInput (Profiler set Search dispatch (Found x ls)) input =
             else run $ Profiler set Search dispatch (Found (init x) ls)
         KeyChar c   ->
             let fileList    = files . active $ set
-                Found s res = getListFromPattern fileList (x ++ [c])
-                (i:is)      = indexStack . active $ set
-                i'          = if (length res) == 0 then i else if i > (last res) then (head res) else head $ dropWhile (< i) res
-                indexStack' = i':is
-                browser     = (active set){indexStack=indexStack'}
-            in run $ Profiler set{active=browser} Search dispatch (Found s res)
+                searchRes   = getListFromPattern fileList (x ++ [c])
+            in
+                case searchRes of
+                NoResults   -> run $ Profiler set Search dispatch (Found (x ++ [c]) ls)
+                Found s res -> run $ Profiler (set' res) Search dispatch (Found s res)
+            where
+                set' r = 
+                    let (i:is)  = indexStack . active $ set
+                        i'          = if (length r) == 0 then i else if i > (last r) then (head r) else head $ dropWhile (< i) r
+                        indexStack' = i':is
+                        browser     = (active set){indexStack=indexStack'}
+                    in set{active=browser}
         _           -> run $ Profiler set Normal dispatch (Found x [0])
 
 drawBorder :: FileBrowser -> IO ()
