@@ -46,9 +46,9 @@ truncateFileName limit file =
     else
         let parts = splitOn "." file
             extension = if (length parts) <= 1 then "" else (last parts)
-            extension' = if (length extension) <= limit then extension else [head extension]
+            extension' = if (length extension) <= limit then '.':extension else '.':[head extension]
             rem = limit - (length extension') - 1
-        in (take (rem - 3) file) ++ "~~~." ++ extension'
+        in (take (rem - 3) file) ++ "~~~" ++ extension'
 --    else (take (limit - 3) file) ++ "~~~"
 
 -- Format directory to be understood by BASH

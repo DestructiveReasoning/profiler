@@ -230,10 +230,14 @@ render (Profiler set _ _ _) =
 displayBrowser :: FileBrowser -> IO ()
 displayBrowser browser = do
     cursSet CursorInvisible
+    (y, x) <- scrSize
     let w           = window browser
+        limit       = x `div` 2 - 2 * marginSize
         wholeDir    = files browser 
+        cwd         = directory browser
+        truncDir    = if (length cwd) < limit then cwd else drop ((length cwd) - limit) cwd
     wMove w (marginSize - 1) 1
-    wAttrSet w (folder, colorYellow) >> wAddStr w (directory browser)
+    wAttrSet w (folder, colorYellow) >> wAddStr w truncDir
     wClearAttribs w
     wMove w marginSize 0
     showFileList browser >> wRefresh w
