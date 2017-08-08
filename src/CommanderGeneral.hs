@@ -48,12 +48,9 @@ truncateFileName limit file =
 makeProperDirectory :: FilePath -> FilePath
 makeProperDirectory [] = []
 makeProperDirectory (x:xs) = 
-    case x of
-        ' '     -> "\\ " ++ (makeProperDirectory xs)
-        '\''    -> "\\'" ++ (makeProperDirectory xs)
-        '['     -> "\\[" ++ (makeProperDirectory xs)
-        ']'     -> "\\]" ++ (makeProperDirectory xs)
-        _       -> x:(makeProperDirectory xs)
+    let badChars = " \'[]()"
+    in if x `elem` badChars then "\\" ++ [x] ++ makeProperDirectory xs 
+                            else x:(makeProperDirectory xs)
 
 -- Get list of files within directory
 getDirectoryList :: FilePath -> IO [FilePath]
