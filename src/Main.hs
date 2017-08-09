@@ -146,23 +146,7 @@ handleInput (Profiler set Normal dispatch search) input =
                 file        = fileList !! index
             in 
                 if (last file) == '/' then run $ Profiler set Normal dispatch search
-                else getProg "" >>= (\p -> openWith (Just p) file dispatch >> (run $ Profiler set Normal dispatch search))
-                where
-                    getProg p = do
-                        win <- createSubWindow
-                        werase win
-                        mvWAddStr win 0 0 $ "Open with: " ++ p
-                        wRefresh win
-                        c <- getCh
-                        case c of
-                            KeyChar '\n'    -> pure p
-                            KeyChar '\b'    -> 
-                                let p' = if (length p == 0) then "" else init p
-                                in getProg $ p'
-                            KeyChar '\DEL'  ->
-                                let p' = if (length p == 0) then "" else init p
-                                in getProg $ p'
-                            KeyChar c       -> getProg $ p ++ [c]
+                else getInput "Open with: " >>= (\p -> openWith (Just p) file dispatch >> (run $ Profiler set Normal dispatch search))
         KeyChar 'g'     -> -- Go to first file
             let (x:xs)      = indexStack . active $ set
                 fileList    = files . active $ set
@@ -190,6 +174,12 @@ handleInput (Profiler set Normal dispatch search) input =
                         indexStack' = i':is
                         browser = (active set){indexStack=indexStack'}
                     in run $ Profiler set{active=browser} Normal dispatch (Found s ls)
+        KeyChar 'd'     -> do -- Delete file
+            let browser = active set
+                f       = (files browser) !! (head (indexStack browser))
+            (a:ns) <- getInput ("Delete " ++ f ++ "? (y/n): ")
+            if a /= 'Y' && a /= 'y' then run $ Profiler set Normal dispatch search
+            else deleteFile browser >>= (\b -> run $ Profiler set{active=b} Normal dispatch search)
         KeyChar 'q'     -> return ()
         _               -> run $ Profiler set Normal dispatch search
 handleInput (Profiler set Search dispatch (Found x ls)) input = 
@@ -219,6 +209,24 @@ handleInput (Profiler set Search dispatch (Found x ls)) input =
                         browser     = (active set){indexStack=indexStack'}
                     in set{active=browser}
         _           -> run $ Profiler set Normal dispatch (Found x [0])
+
+getInput :: String -> IO String
+getInput prompt = getProg "" where
+    getProg p = do
+        win <- createSubWindow
+        werase win
+        mvWAddStr win 0 0 $ prompt ++ p
+        wRefresh win
+        c <- getCh
+        case c of
+            KeyChar '\n'    -> pure p
+            KeyChar '\b'    -> 
+                let p' = if (length p == 0) then "" else init p
+                in getProg $ p'
+            KeyChar '\DEL'  ->
+                let p' = if (length p == 0) then "" else init p
+                in getProg $ p'
+            KeyChar c       -> getProg $ p ++ [c]
 
 drawBorder :: FileBrowser -> IO ()
 drawBorder browser = 

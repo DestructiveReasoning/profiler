@@ -2,6 +2,7 @@ module CommanderGeneral
 (   
     cd
   , changeDir
+  , deleteFile
   , fileChar
   , getDirectoryList
   , quicksort
@@ -101,3 +102,15 @@ changeDir path browser =
                     else tail stack 
                 else 0:stack
             in return browser{ directory = directory', files = files', indexStack = indexStack' }
+
+deleteFile :: FileBrowser -> IO FileBrowser
+deleteFile browser = 
+    let f       = (files browser) !! (head (indexStack browser))
+        (i:is)  = indexStack browser
+        i'      = if i == (length (files browser)) - 1 then i - 1 else i
+        dir     = directory browser
+    in
+        if (last f == '/') then return browser
+        else
+            (\x -> x ++ "/" ++ f) <$> getCurrentDirectory >>= removeFile >>
+            sortDirectoryList <$> getDirectoryList dir >>= (\l -> return browser{files=l, indexStack=(i':is)})
