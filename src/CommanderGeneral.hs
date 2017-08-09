@@ -45,11 +45,12 @@ truncateFileName limit file =
     else if last file == '/' then (take (limit - 3) file) ++ "~~/"
     else
         let parts = splitOn "." file
-            extension = if (length parts) <= 1 then "" else (last parts)
-            extension' = if (length extension) <= limit then '.':extension else '.':[head extension]
+            extension = if (length parts) <= 1 || length (head parts) == 0 then "" else (last parts)
+            extension' =    if (length extension) == 0 then ""
+                            else if ((length extension) + 4) <= limit then '.':extension
+                            else '.':[head extension]
             rem = limit - (length extension') - 1
         in (take (rem - 3) file) ++ "~~~" ++ extension'
---    else (take (limit - 3) file) ++ "~~~"
 
 -- Format directory to be understood by BASH
 makeProperDirectory :: FilePath -> FilePath
