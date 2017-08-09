@@ -14,6 +14,7 @@ l:    If a directory is selected, navigate to that directory. Else execute the s
 o:    Prompts for name of program to open the file with
 g:    Navigate to the first file in the directory
 G:    Navigate to the last file in the directory
+d:    Delete the selected file
 ^:    Navigate to the user's home directory
 /:    Search current directory
 n:    Next search result
