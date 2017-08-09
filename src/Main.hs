@@ -10,8 +10,6 @@ import UI.HSCurses.CursesHelper
 
 data ProfilerMode = Normal | Search | Visual | Insert deriving (Show, Eq)
 
-data FileMod = MV | CP | MKDIR deriving (Eq, Show)
-
 data Orientation = NormalOri | FlippedOri deriving (Eq)
 
 data CycleDir = Forward | Backward deriving (Eq)

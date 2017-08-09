@@ -11,6 +11,7 @@ module CommanderGeneral
   , sortDirectoryList
   , sliceList
   , FileBrowser (..)
+  , FileMod (..)
 ) where
 
 import Control.Monad
@@ -30,6 +31,8 @@ data FileBrowser = FileBrowser {
     files :: [FilePath],
     indexStack :: [Int]
 } deriving (Show)
+
+data FileMod = CP | MV deriving (Eq)
 
 fileChar = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'] ++ ['1'..'9'] ++ "!@#$%^&*()_+~`^-={}/?\"\';:<>,. "
 
@@ -114,3 +117,16 @@ deleteFile browser =
         else
             (\x -> x ++ "/" ++ f) <$> getCurrentDirectory >>= removeFile >>
             sortDirectoryList <$> getDirectoryList dir >>= (\l -> return browser{files=l, indexStack=(i':is)})
+
+copyTo :: FilePath -> FileBrowser -> IO FileBrowser
+copyTo destination browser = 
+    let (i:is)  = indexStack browser
+        dir     = directory browser
+        f       = (files browser) !! i
+    in
+        if (last f == '/') then return browser
+        else do
+            src <- (\x -> x ++ "/" ++ f) <$> getCurrentDirectory
+            dst <- (\d -> if d then destination ++ "/" ++ f else destination) <$> doesDirectoryExist destination
+            copyFile src dst
+            return browser
