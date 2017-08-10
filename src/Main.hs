@@ -142,9 +142,10 @@ handleInput (Profiler set Normal dispatch search) input =
             let fileList    = files . active $ set
                 index       = head $ indexStack . active $ set
                 file        = fileList !! index
+                prof        = Profiler set Normal dispatch search
             in 
-                if (last file) == '/' then run $ Profiler set Normal dispatch search
-                else getInput "Open with: " >>= (\p -> openWith (Just p) file dispatch >> (run $ Profiler set Normal dispatch search))
+                if (last file) == '/' then run prof
+                else getInput "Open with: " >>= (\p -> openWith (Just p) file dispatch >> run prof)
         KeyChar 'g'     -> -- Go to first file
             let (x:xs)      = indexStack . active $ set
                 fileList    = files . active $ set
@@ -191,7 +192,8 @@ handleInput (Profiler set Normal dispatch search) input =
             if (length ans) < 1 then run $ Profiler set Normal dispatch search
             else copyTo ans MV browser >> reindexProfiler (Profiler set Normal dispatch search) >>= run
         KeyChar 'a'     -> 
-            getInput "Make directory: " >>= (\d -> mkdir d (active set) >> reindexProfiler (Profiler set Normal dispatch search) >>= run)
+            let prof = Profiler set Normal dispatch search
+            in getInput "Make directory: " >>= (\d -> mkdir d (active set) >> reindexProfiler prof >>= run)
         KeyChar 'q'     -> return ()
         _               -> run $ Profiler set Normal dispatch search
 handleInput (Profiler set Search dispatch (Found x ls)) input = 
