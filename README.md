@@ -17,6 +17,7 @@ G:    Navigate to the last file in the directory
 d:    Delete the selected file
 y:    Copy the selected file to a destination defined by an input prompt
 S:    Move the selected file to a destination defined by an input prompt
+a:    Create a directory (and its parents) defined by an input prompt
 ^:    Navigate to the user's home directory
 /:    Search current directory
 n:    Next search result
