@@ -177,7 +177,19 @@ handleInput (Profiler set Normal dispatch search) input =
                 f       = (files browser) !! (head (indexStack browser))
             (a:ns) <- getInput ("Delete " ++ f ++ "? (y/n): ")
             if a /= 'Y' && a /= 'y' then run $ Profiler set Normal dispatch search
-            else deleteFile browser >>= (\b -> run $ Profiler set{active=b} Normal dispatch search)
+            else deleteFile browser >> reindexProfiler (Profiler set Normal dispatch search) >>= run
+        KeyChar 'y'     -> do -- Copy file to given destination
+            let browser = active set
+                f       = (files browser) !! (head (indexStack browser))
+            ans <- getInput ("Copy " ++ f ++ " to: ")
+            if (length ans) < 1 then run $ Profiler set Normal dispatch search
+            else copyTo ans CP browser >> reindexProfiler (Profiler set Normal dispatch search) >>= run
+        KeyChar 'S'     -> do -- Move file to given destination
+            let browser = active set
+                f       = (files browser) !! (head (indexStack browser))
+            ans <- getInput ("Move " ++ f ++ " to: ")
+            if (length ans) < 1 then run $ Profiler set Normal dispatch search
+            else copyTo ans MV browser >> reindexProfiler (Profiler set Normal dispatch search) >>= run
         KeyChar 'q'     -> return ()
         _               -> run $ Profiler set Normal dispatch search
 handleInput (Profiler set Search dispatch (Found x ls)) input = 
@@ -253,6 +265,12 @@ displayBrowser browser = do
     wClearAttribs w
     wMove w marginSize 0
     showFileList browser >> wRefresh w
+
+reindexProfiler :: Profiler -> IO Profiler
+reindexProfiler (Profiler set m d s) = do
+    a' <- reindexBrowser $ active set
+    p' <- reindexBrowser $ passive set
+    pure $ Profiler set{active=a', passive=p'} m d s
 
 -- Calculates indices to display from list
 getDisplayListIndices :: FileBrowser -> IO (ScrollIndex Int)

@@ -2,12 +2,14 @@ module CommanderGeneral
 (   
     cd
   , changeDir
+  , copyTo
   , deleteFile
   , fileChar
   , getDirectoryList
   , quicksort
   , makeProperDirectory
   , truncateFileName
+  , reindexBrowser
   , sortDirectoryList
   , sliceList
   , FileBrowser (..)
@@ -67,7 +69,7 @@ makeProperDirectory (x:xs) =
 -- Get list of files within directory
 getDirectoryList :: FilePath -> IO [FilePath]
 getDirectoryList path = 
-    getDirectoryContents path >>= mapM modDir
+    setCurrentDirectory path >> getDirectoryContents path >>= mapM modDir
     where
         modDir path = (\isDir -> if isDir then path ++ "/" else path) <$> doesDirectoryExist path
 
@@ -106,27 +108,29 @@ changeDir path browser =
                 else 0:stack
             in return browser{ directory = directory', files = files', indexStack = indexStack' }
 
-deleteFile :: FileBrowser -> IO FileBrowser
-deleteFile browser = 
-    let f       = (files browser) !! (head (indexStack browser))
-        (i:is)  = indexStack browser
-        i'      = if i == (length (files browser)) - 1 then i - 1 else i
-        dir     = directory browser
-    in
-        if (last f == '/') then return browser
-        else
-            (\x -> x ++ "/" ++ f) <$> getCurrentDirectory >>= removeFile >>
-            sortDirectoryList <$> getDirectoryList dir >>= (\l -> return browser{files=l, indexStack=(i':is)})
-
-copyTo :: FilePath -> FileBrowser -> IO FileBrowser
-copyTo destination browser = 
+reindexBrowser :: FileBrowser -> IO FileBrowser
+reindexBrowser browser = 
     let (i:is)  = indexStack browser
+        maxi    = (length . files) browser - 1
+        i'      = if i > maxi then maxi else i
         dir     = directory browser
-        f       = (files browser) !! i
-    in
-        if (last f == '/') then return browser
+    in sortDirectoryList <$> getDirectoryList dir >>= (\l -> return browser{files=l, indexStack=((min i' ((length l)-1)):is)})
+    where min a b = if a < b then a else b
+
+deleteFile :: FileBrowser -> IO ()
+deleteFile browser = 
+    let f = (files browser) !! (head (indexStack browser))
+    in  if (last f == '/') then return ()
+        else
+            setCurrentDirectory (directory browser) >>
+            (\x -> x ++ "/" ++ f) <$> getCurrentDirectory >>= removeFile
+
+copyTo :: FilePath -> FileMod -> FileBrowser -> IO ()
+copyTo destination op browser = 
+    let f = (files browser) !! (head (indexStack browser))
+    in  if (last f == '/') || (length destination == 0) then return ()
         else do
+            setCurrentDirectory $ directory browser
             src <- (\x -> x ++ "/" ++ f) <$> getCurrentDirectory
             dst <- (\d -> if d then destination ++ "/" ++ f else destination) <$> doesDirectoryExist destination
-            copyFile src dst
-            return browser
+            if op == CP then copyFile src dst else renameFile src dst
