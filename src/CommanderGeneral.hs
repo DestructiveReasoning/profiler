@@ -8,6 +8,7 @@ module CommanderGeneral
   , getDirectoryList
   , quicksort
   , makeProperDirectory
+  , mkdir
   , truncateFileName
   , reindexBrowser
   , sortDirectoryList
@@ -134,3 +135,6 @@ copyTo destination op browser =
             src <- (\x -> x ++ "/" ++ f) <$> getCurrentDirectory
             dst <- (\d -> if d then destination ++ "/" ++ f else destination) <$> doesDirectoryExist destination
             if op == CP then copyFile src dst else renameFile src dst
+
+mkdir :: FilePath -> FileBrowser -> IO ()
+mkdir dir browser = setCurrentDirectory (directory browser) >> createDirectoryIfMissing True dir

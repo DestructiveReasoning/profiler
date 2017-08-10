@@ -190,6 +190,8 @@ handleInput (Profiler set Normal dispatch search) input =
             ans <- getInput ("Move " ++ f ++ " to: ")
             if (length ans) < 1 then run $ Profiler set Normal dispatch search
             else copyTo ans MV browser >> reindexProfiler (Profiler set Normal dispatch search) >>= run
+        KeyChar 'a'     -> 
+            getInput "Make directory: " >>= (\d -> mkdir d (active set) >> reindexProfiler (Profiler set Normal dispatch search) >>= run)
         KeyChar 'q'     -> return ()
         _               -> run $ Profiler set Normal dispatch search
 handleInput (Profiler set Search dispatch (Found x ls)) input = 
