@@ -17,6 +17,7 @@ module CommanderGeneral
   , FileMod (..)
 ) where
 
+import Control.Exception
 import Control.Monad
 import Data.Char
 import Data.List.Split
@@ -124,7 +125,12 @@ deleteFile browser =
     in  if (last f == '/') then return ()
         else
             setCurrentDirectory (directory browser) >>
-            (\x -> x ++ "/" ++ f) <$> getCurrentDirectory >>= removeFile
+            (\x -> x ++ "/" ++ f) <$> getCurrentDirectory >>= removeFile'
+    where removeFile' f = do
+            result <- try (removeFile f) :: IO (Either SomeException ())
+            case result of
+                Left ex -> return ()
+                Right _ -> return ()
 
 copyTo :: FilePath -> FileMod -> FileBrowser -> IO ()
 copyTo destination op browser = 
@@ -134,7 +140,17 @@ copyTo destination op browser =
             setCurrentDirectory $ directory browser
             src <- (\x -> x ++ "/" ++ f) <$> getCurrentDirectory
             dst <- (\d -> if d then destination ++ "/" ++ f else destination) <$> doesDirectoryExist destination
-            if op == CP then copyFile src dst else renameFile src dst
+            if op == CP then copyFile src dst else renameFile' src dst
+    where renameFile' a b = do
+            result <- try (renameFile a b) :: IO (Either SomeException ())
+            case result of
+                Left ex -> return ()
+                Right _ -> return ()
 
 mkdir :: FilePath -> FileBrowser -> IO ()
-mkdir dir browser = setCurrentDirectory (directory browser) >> createDirectoryIfMissing True dir
+mkdir dir browser = setCurrentDirectory (directory browser) >> createDirectoryIfMissing' dir
+    where createDirectoryIfMissing' a = do
+            result <- try (createDirectoryIfMissing True a) :: IO (Either SomeException ())
+            case result of
+                Left ex -> return ()
+                Right _ -> return ()
