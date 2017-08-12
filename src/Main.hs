@@ -14,6 +14,8 @@ data Orientation = NormalOri | FlippedOri deriving (Eq)
 
 data CycleDir = Forward | Backward deriving (Eq)
 
+data FeedbackType = ErrorMessage | SuccessMessage | WarningMessage
+
 data WindowSet = WindowSet {
     active      :: FileBrowser,
     passive     :: FileBrowser,
@@ -59,6 +61,7 @@ initColors = do
     initPair (Pair 3) (Color 235) defaultBackground
     initPair (Pair 4) (Color 220) defaultBackground
     initPair (Pair 5) (Color 179) defaultBackground
+    initPair (Pair 6) (Color 124) defaultBackground
 
 initColors16 = do
     initPair (Pair 1) blue defaultBackground
@@ -74,6 +77,7 @@ colorYellow = Pair 4
 color179 = Pair 5
 colorGreen = Pair 5
 colorMagenta = Pair 3
+colorRed = Pair 6
 
 -- Clears formatting and color attributes of window
 wClearAttribs :: Window -> IO ()
@@ -176,24 +180,43 @@ handleInput (Profiler set Normal dispatch search) input =
         KeyChar 'd'     -> do -- Delete file
             let browser = active set
                 f       = (files browser) !! (head (indexStack browser))
+                prof    = Profiler set Normal dispatch search
             (a:ns) <- getInput ("Delete " ++ f ++ "? (y/n): ")
-            if a /= 'Y' && a /= 'y' then run $ Profiler set Normal dispatch search
-            else deleteFile browser >> reindexProfiler (Profiler set Normal dispatch search) >>= run
+            if a /= 'Y' && a /= 'y' then run prof
+            else do
+                result <- deleteFile browser 
+                case result of
+                    Left err -> giveFeedback ErrorMessage err >> run prof
+                    _ -> reindexProfiler (Profiler set Normal dispatch search) >>= run
         KeyChar 'y'     -> do -- Copy file to given destination
             let browser = active set
                 f       = (files browser) !! (head (indexStack browser))
+                prof    = Profiler set Normal dispatch search
             ans <- getInput ("Copy " ++ f ++ " to: ")
             if (length ans) < 1 then run $ Profiler set Normal dispatch search
-            else copyTo ans CP browser >> reindexProfiler (Profiler set Normal dispatch search) >>= run
+            else do
+                result <- copyTo ans CP browser
+                case result of
+                    Left err -> giveFeedback ErrorMessage err >> run prof
+                    _ -> reindexProfiler prof >>= run
         KeyChar 'S'     -> do -- Move file to given destination
             let browser = active set
                 f       = (files browser) !! (head (indexStack browser))
+                prof    = Profiler set Normal dispatch search
             ans <- getInput ("Move " ++ f ++ " to: ")
-            if (length ans) < 1 then run $ Profiler set Normal dispatch search
-            else copyTo ans MV browser >> reindexProfiler (Profiler set Normal dispatch search) >>= run
-        KeyChar 'a'     -> 
+            if (length ans) < 1 then run prof
+            else do
+                result <- copyTo ans MV browser 
+                case result of
+                    Left err -> giveFeedback ErrorMessage err >> run prof
+                    _ -> reindexProfiler prof >>= run
+        KeyChar 'a'     -> do
             let prof = Profiler set Normal dispatch search
-            in getInput "Make directory: " >>= (\d -> mkdir d (active set) >> reindexProfiler prof >>= run)
+            dir <- getInput "Make directory: " 
+            result <- mkdir dir (active set) 
+            case result of
+                Left err -> giveFeedback ErrorMessage err >> run prof
+                _ -> reindexProfiler prof >>= run
         KeyChar 'q'     -> return ()
         _               -> run $ Profiler set Normal dispatch search
 handleInput (Profiler set Search dispatch (Found x ls)) input = 
@@ -242,6 +265,14 @@ getInput prompt = getProg "" where
                 in getProg $ p'
             KeyChar c       -> getProg $ p ++ [c]
 
+giveFeedback :: FeedbackType -> String -> IO ()
+giveFeedback ErrorMessage msg = do
+    w <- createSubWindow
+    werase w >> wAttrSet w (folder, colorRed)
+    mvWAddStr w 0 0 msg >> mvWAddStr w 1 0 "Press any key to continue..." >> wClearAttribs w >> wRefresh w
+    getCh >> return ()
+giveFeedback _ _ = return ()
+
 drawBorder :: FileBrowser -> IO ()
 drawBorder browser = 
     let w = window browser
@@ -251,7 +282,7 @@ clear :: Profiler -> IO ()
 clear (Profiler set _ _ _) = werase (window (active set)) >> werase (window (passive set))
 
 render :: Profiler -> IO ()
-render (Profiler set _ _ _) =
+render (Profiler set mode _ _) =
     drawBorder (active set) >> displayBrowser (active set) >> displayBrowser (passive set)
 
 -- Displays FileBrowser contents

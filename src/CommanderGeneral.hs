@@ -119,38 +119,38 @@ reindexBrowser browser =
     in sortDirectoryList <$> getDirectoryList dir >>= (\l -> return browser{files=l, indexStack=((min i' ((length l)-1)):is)})
     where min a b = if a < b then a else b
 
-deleteFile :: FileBrowser -> IO ()
+deleteFile :: FileBrowser -> IO (Either String ())
 deleteFile browser = 
     let f = (files browser) !! (head (indexStack browser))
-    in  if (last f == '/') then return ()
+    in  if (last f == '/') then return (Left "Cannot delete directory")
         else
             setCurrentDirectory (directory browser) >>
             (\x -> x ++ "/" ++ f) <$> getCurrentDirectory >>= removeFile'
     where removeFile' f = do
             result <- try (removeFile f) :: IO (Either SomeException ())
             case result of
-                Left ex -> return ()
-                Right _ -> return ()
+                Left ex -> return (Left "Cannot delete file")
+                Right _ -> return (Right ())
 
-copyTo :: FilePath -> FileMod -> FileBrowser -> IO ()
+copyTo :: FilePath -> FileMod -> FileBrowser -> IO (Either String ())
 copyTo destination op browser = 
     let f = (files browser) !! (head (indexStack browser))
-    in  if (last f == '/') || (length destination == 0) then return ()
+    in  if (last f == '/') || (length destination == 0) then return (Left "Invalid source or destination")
         else do
             setCurrentDirectory $ directory browser
             src <- (\x -> x ++ "/" ++ f) <$> getCurrentDirectory
             dst <- (\d -> if d then destination ++ "/" ++ f else destination) <$> doesDirectoryExist destination
-            if op == CP then copyFile src dst else renameFile' src dst
+            renameFile' src dst
     where renameFile' a b = do
-            result <- try (renameFile a b) :: IO (Either SomeException ())
+            result <- try (if op == CP then copyFile a b else renameFile a b) :: IO (Either SomeException ())
             case result of
-                Left ex -> return ()
-                Right _ -> return ()
+                Left ex -> return (Left "Cannot copy/move file")
+                Right _ -> return (Right ())
 
-mkdir :: FilePath -> FileBrowser -> IO ()
+mkdir :: FilePath -> FileBrowser -> IO (Either String ())
 mkdir dir browser = setCurrentDirectory (directory browser) >> createDirectoryIfMissing' dir
     where createDirectoryIfMissing' a = do
             result <- try (createDirectoryIfMissing True a) :: IO (Either SomeException ())
             case result of
-                Left ex -> return ()
-                Right _ -> return ()
+                Left ex -> return (Left "Cannot make directory with that name")
+                Right _ -> return (Right ())
