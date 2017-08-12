@@ -21,6 +21,7 @@ a:    Create a directory (and its parents) defined by an input prompt
 ^:    Navigate to the user's home directory
 /:    Search current directory
 n:    Next search result
+N:    Previous search result
 Tab:  Switch frames
 q:    Quit Profiler
 ```
