@@ -12,8 +12,6 @@ data ProfilerMode = Normal | Search | Visual | Insert deriving (Show, Eq)
 
 data Orientation = NormalOri | FlippedOri deriving (Eq)
 
-data CycleDir = Forward | Backward deriving (Eq)
-
 data FeedbackType = ErrorMessage | SuccessMessage | WarningMessage
 
 data WindowSet = WindowSet {
@@ -173,7 +171,17 @@ handleInput (Profiler set Normal dispatch search) input =
                 Found s []  -> run $ Profiler set Normal dispatch search
                 Found s ls  -> 
                     let (i:is) = indexStack . active $ set
-                        i' = if (i+1) > (last ls) then (head ls) else head $ dropWhile (< i + 1) ls
+                        i' = cycleSearch Forward i ls
+                        indexStack' = i':is
+                        browser = (active set){indexStack=indexStack'}
+                    in run $ Profiler set{active=browser} Normal dispatch (Found s ls)
+        KeyChar 'N'     -> -- Cycle through search results
+            case search of
+                NoResults   -> run $ Profiler set Normal dispatch search
+                Found s []  -> run $ Profiler set Normal dispatch search
+                Found s ls  -> 
+                    let (i:is) = indexStack . active $ set
+                        i' = cycleSearch Backward i ls
                         indexStack' = i':is
                         browser = (active set){indexStack=indexStack'}
                     in run $ Profiler set{active=browser} Normal dispatch (Found s ls)

@@ -1,8 +1,10 @@
 module Interrogator
 (
-     findConcretePattern
+     cycleSearch
+    ,findConcretePattern
     ,getListFromPattern
     ,validateRegex
+    ,CycleDir (..)
     ,SearchResult (..)
 ) where
 
@@ -11,6 +13,8 @@ import Text.Regex
 
 data SearchResult = NoResults | Found String [Int]
 
+data CycleDir = Forward | Backward deriving (Eq)
+
 -- Get list of indices in file list that matches a pattern
 getListFromPattern :: [String] -> String -> SearchResult
 getListFromPattern list pattern = 
@@ -18,6 +22,14 @@ getListFromPattern list pattern =
         let regex = mkRegex $ ".*" ++ pattern ++ ".*"
         in Found pattern [x | x <- [0..(length list - 1)], isJust $ matchRegex regex (list !! x)]
     else NoResults
+
+cycleSearch :: CycleDir -> Int -> [Int] -> Int
+cycleSearch Forward index is =
+    if (index + 1) > (last is) then head is
+    else head $ dropWhile (< index + 1) is
+cycleSearch Backward index is =
+    if (index - 1) < (head is) then last is
+    else last $ takeWhile (<= index - 1) is
 
 validateRegex :: String -> Bool
 validateRegex = validateParens
