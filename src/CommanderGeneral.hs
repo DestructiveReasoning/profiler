@@ -107,6 +107,7 @@ changeDir path browser =
                 if path == "../" then 
                     if (length stack) < 2 then [0]
                     else tail stack 
+                else if path == "./" then stack
                 else 0:stack
             in return browser{ directory = directory', files = files', indexStack = indexStack' }
 
