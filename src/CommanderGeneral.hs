@@ -6,6 +6,7 @@ module CommanderGeneral
   , deleteFile
   , fileChar
   , getDirectoryList
+  , isExecutable
   , quicksort
   , makeProperDirectory
   , mkdir
@@ -155,3 +156,10 @@ mkdir dir browser = setCurrentDirectory (directory browser) >> createDirectoryIf
             case result of
                 Left ex -> return (Left "Cannot make directory with that name")
                 Right _ -> return (Right ())
+
+isExecutable :: FilePath -> IO (Either String Bool)
+isExecutable path = do
+    result <- try (executable <$> getPermissions path) :: IO (Either SomeException Bool)
+    case result of
+        Left ex -> return (Left "Insufficient power to view permissions")
+        Right b -> return (Right b)

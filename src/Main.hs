@@ -337,16 +337,17 @@ showFileList browser =
                showFile (sel == cur) x >> showList sel (cur + 1) xs
             showFile isSelected file = 
                 let w = window browser
-                    attrib = 
-                        if (isSelected) then (selected, colorBlue)
-                        else if ((last file) == '/') then (folder, colorBlue)
-                        else (attr0, (Pair 0))
                     in do
+                        attrib <- getAttrib isSelected file
                         (y,_) <- getYX w
                         limit <- fileDisplayLength
                         let trunc   = truncateFileName limit file
                             file'   = trunc ++ (spaces (limit - (length trunc)))
                         wAttrSet w attrib >> mvWAddStr w (y+1) 1 file' >> wClearAttribs w
+            getAttrib isSelected file = 
+                if isSelected then pure (selected, colorBlue)
+                else if (last file) == '/' then pure (folder, colorBlue)
+                else (\e -> if e == Right True then (attr0, colorRed) else (attr0, (Pair 0))) <$> (isExecutable file)
 
 -- Generates string of spaces
 spaces :: Int -> [Char]
