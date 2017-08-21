@@ -31,7 +31,7 @@ q:    Quit Profiler
 Configuration
 -------------
 ### Default Applications
-Default applications can be specified in the `~/.profiler` file, with the following syntax:
+Default applications can be specified in the `~/.profiler/defaults` file, with the following syntax:
 ```
 <file extension 1>, <program 1>
 <file extension 2>, <program 2>
@@ -51,6 +51,32 @@ For such cases, it is recommended to open the file with your CLI/TUI program in 
 *~/.profiler*
 ```
 hs, xterm -e vim
+```
+
+### Custom Colorscheme
+Custom color settings can be defined in the `~/.profiler/colors` file, with the following syntax:
+```
+<color class1> <foreground1> <background1>
+<color class2> <foreground2> <background2>
+```
+Foreground and background colors are 8-bit, so should be written as a number between 0 and 255, or -1 for the default terminal foreground or background.<br>
+Color class defines which part of the UI the following color pair should be used for.<br>
+Currently, the valid color classes are:
+* selected: Color of the selected item
+* folder: Color used for folders
+* executable: Color used for executable files
+* border: Color used for the border of the selected pane
+* cwd: Color used for the output of the current working directory
+* error: Color used for error messages
+Note that if a `~/.profiler/colors` exists, it is recommended that all color classes be defined. Otherwise the colorscheme may look ugly.
+The default colorscheme would look like:
+```
+selected 4 -1
+folder 4 -1
+executable 83 -1
+border 220 -1
+cwd 220 -1
+error 160 -1 
 ```
 
 Dependencies
