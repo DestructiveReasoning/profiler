@@ -2,7 +2,7 @@ import CommanderGeneral
 import Data.Maybe
 import Dispatch
 import Interrogator
-import System.Directory (doesFileExist, getCurrentDirectory, getHomeDirectory)
+import System.Directory (doesFileExist, getCurrentDirectory, getHomeDirectory, setCurrentDirectory)
 import System.IO
 import System.Posix.Signals
 import UI.HSCurses.Curses
@@ -60,6 +60,7 @@ initColors = do
     initPair (Pair 4) (Color 220) defaultBackground
     initPair (Pair 5) (Color 179) defaultBackground
     initPair (Pair 6) (Color 124) defaultBackground
+    initPair (Pair 7) (Color 185) defaultBackground
 
 initColors16 = do
     initPair (Pair 1) blue defaultBackground
@@ -76,6 +77,7 @@ color179 = Pair 5
 colorGreen = Pair 5
 colorMagenta = Pair 3
 colorRed = Pair 6
+colorExec = Pair 7
 
 -- Clears formatting and color attributes of window
 wClearAttribs :: Window -> IO ()
@@ -113,11 +115,15 @@ reSearch (Profiler set mode dispatch search) =
                 Found s res = getListFromPattern fileList x
             in Profiler set mode dispatch (Found s res)
 
+switchPanes :: Profiler -> IO Profiler
+switchPanes (Profiler set Normal dispatch search) = 
+    setCurrentDirectory (directory (passive set)) >> (pure $ reSearch $ Profiler (flipWindowSet set) Normal dispatch search)
+
 handleInput :: Profiler -> Key -> IO ()
 handleInput (Profiler set Normal dispatch search) input = 
     case input of
         KeyChar '\t'    -> -- Switch frames
-            run $ reSearch (Profiler (flipWindowSet set) Normal dispatch search)
+            switchPanes (Profiler set Normal dispatch search) >>= run
         KeyChar 'j'     -> -- Move down
             let (loc:rest)  = indexStack . active $ set
                 fileList    = files . active $ set
@@ -347,7 +353,7 @@ showFileList browser =
             getAttrib isSelected file = 
                 if isSelected then pure (selected, colorBlue)
                 else if (last file) == '/' then pure (folder, colorBlue)
-                else (\e -> if e == Right True then (attr0, colorRed) else (attr0, (Pair 0))) <$> (isExecutable file)
+                else (\e -> if e == Right True then (attr0, colorExec) else (attr0, (Pair 0))) <$> (isExecutable file)
 
 -- Generates string of spaces
 spaces :: Int -> [Char]
