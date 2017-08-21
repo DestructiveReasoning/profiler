@@ -318,7 +318,7 @@ showFileList browser =
                         (y,_) <- getYX w
                         limit <- fileDisplayLength
                         let trunc   = truncateFileName limit file
-                            file'   = trunc ++ (spaces (limit - (length trunc)))
+                            file'   = if (isSelected) then trunc ++ (spaces (limit - (length trunc))) else trunc
                         wAttrSet w attrib >> mvWAddStr w (y+1) 1 file' >> wClearAttribs w
             getAttrib isSelected file = 
                 if isSelected then pure (selected, colorSelected)
