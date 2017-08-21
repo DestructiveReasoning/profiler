@@ -1,0 +1,3 @@
+tex, xterm -e vim
+log, xterm -e vim
+hs, xterm -e vim

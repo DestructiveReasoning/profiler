@@ -1,6 +1,7 @@
 builddir="build/"
 bindir="bin/"
 srcdir="src/"
+configdir="config/"
 legacysrcdir=$(srcdir)Legacy/
 profilerdir=$(HOME)/.profiler
 
@@ -20,5 +21,9 @@ legacy: init
 clean:
 	rm -rf $(builddir)
 
-install:
+install: installconfig
 	install -Dm755 $(bindir)profiler /bin/profiler
+
+installconfig:
+	mkdir -p $(profilerdir)
+	cp -n $(configdir)* $(profilerdir)/

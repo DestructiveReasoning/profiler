@@ -68,6 +68,7 @@ Currently, the valid color classes are:
 * border: Color used for the border of the selected pane
 * cwd: Color used for the output of the current working directory
 * error: Color used for error messages
+* symlink: Color used for a file that is a symbolic link
 Note that if a `~/.profiler/colors` exists, it is recommended that all color classes be defined. Otherwise the colorscheme may look ugly.
 The default colorscheme would look like:
 ```
@@ -77,6 +78,7 @@ executable 83 -1
 border 220 -1
 cwd 220 -1
 error 160 -1 
+symlink 63 -1
 ```
 
 Dependencies
