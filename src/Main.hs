@@ -322,8 +322,16 @@ showFileList browser =
                         wAttrSet w attrib >> mvWAddStr w (y+1) 1 file' >> wClearAttribs w
             getAttrib isSelected file = 
                 if isSelected then pure (selected, colorSelected)
-                else if (last file) == '/' then pure (folder, colorFolder)
-                else (\e -> if e == Right True then (attr0, colorExec) else (attr0, (Pair 0))) <$> (isExecutable file)
+                else do
+                    let isFolder = (last file) == '/'
+                        style = if isFolder then folder else attr0
+                    exec <- isExecutable file
+                    link <- isSymLink file
+                    let color = if exec == Right True then colorExec
+                                else if link  == Right True then colorLink 
+                                else if isFolder then colorFolder
+                                else (Pair 0)
+                    pure (style, color)
 
 -- Generates string of spaces
 spaces :: Int -> [Char]

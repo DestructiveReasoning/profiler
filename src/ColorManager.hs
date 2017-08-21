@@ -28,6 +28,7 @@ readColorConfig file =
             "border"        -> Just 4
             "cwd"           -> Just 5
             "error"         -> Just 6
+            "symlink"       -> Just 7
             _ -> Nothing
     parseLines cfg _ [] = Left cfg
     parseLines cfg n (x:xs) =
@@ -92,6 +93,7 @@ initColors = do
     initPair (Pair 4) (Color 220) defaultBackground
     initPair (Pair 5) (Color 220) defaultBackground
     initPair (Pair 6) (Color 124) defaultBackground
+    initPair (Pair 7) (Color 63) defaultBackground
 
 initColors16 = do
     initPair (Pair 1) blue defaultBackground
@@ -106,3 +108,4 @@ colorExec = Pair 3
 colorBorder = Pair 4
 colorCWD = Pair 5
 colorError = Pair 6
+colorLink = Pair 7

@@ -7,6 +7,7 @@ module CommanderGeneral
   , fileChar
   , getDirectoryList
   , isExecutable
+  , isSymLink
   , quicksort
   , makeProperDirectory
   , mkdir
@@ -162,4 +163,11 @@ isExecutable path = do
     result <- try (executable <$> getPermissions path) :: IO (Either SomeException Bool)
     case result of
         Left ex -> return (Left "Insufficient power to view permissions")
+        Right b -> return (Right b)
+
+isSymLink :: FilePath -> IO (Either String Bool)
+isSymLink path = do
+    result <- try (pathIsSymbolicLink path) :: IO (Either SomeException Bool)
+    case result of
+        Left ex -> return (Left ("Cannot analyze " ++ path ++ ": make sure it exists and that permissions are satisfied."))
         Right b -> return (Right b)
