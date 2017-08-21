@@ -1,3 +1,4 @@
+import ColorManager
 import CommanderGeneral
 import Data.Maybe
 import Dispatch
@@ -35,10 +36,6 @@ switch FlippedOri = NormalOri
 flipWindowSet :: WindowSet -> WindowSet
 flipWindowSet set = set{active=(passive set), passive=(active set), orientation=(switch (orientation set))}
 
--- ATTRIBUTES
-selected = convertAttributes [Reverse, Bold]
-folder = convertAttributes [Bold]
-
 -- Specifies margin on windows
 marginSize :: Int
 marginSize = 2
@@ -51,33 +48,6 @@ fileCapacity = fst <$> scrSize >>= (\y -> pure(y - 3*marginSize))
 fileDisplayLength :: IO Int
 fileDisplayLength = snd <$> scrSize >>= (\x -> pure(x `div` 2 - 2*marginSize))
 
--- COLORS
-initColors = do
-    initPair (Pair 1) (Color 60) defaultBackground
-    initPair (Pair 2) blue defaultBackground
-    initPair (Pair 3) (Color 235) defaultBackground
-    initPair (Pair 3) (Color 235) defaultBackground
-    initPair (Pair 4) (Color 220) defaultBackground
-    initPair (Pair 5) (Color 179) defaultBackground
-    initPair (Pair 6) (Color 124) defaultBackground
-    initPair (Pair 7) (Color 185) defaultBackground
-
-initColors16 = do
-    initPair (Pair 1) blue defaultBackground
-    initPair (Pair 2) blue defaultBackground
-    initPair (Pair 3) magenta defaultBackground
-    initPair (Pair 4) yellow defaultBackground
-    initPair (Pair 5) green defaultBackground
-
-color60 = Pair 1
-colorBlue = Pair 2
-color235 = Pair 3
-colorYellow = Pair 4
-color179 = Pair 5
-colorGreen = Pair 5
-colorMagenta = Pair 3
-colorRed = Pair 6
-colorExec = Pair 7
 
 -- Clears formatting and color attributes of window
 wClearAttribs :: Window -> IO ()
@@ -282,7 +252,7 @@ getInput prompt = getProg "" where
 giveFeedback :: FeedbackType -> String -> IO ()
 giveFeedback ErrorMessage msg = do
     w <- createSubWindow
-    werase w >> wAttrSet w (folder, colorRed)
+    werase w >> wAttrSet w (folder, colorError)
     mvWAddStr w 0 0 msg >> mvWAddStr w 1 0 "Press any key to continue..." >> wClearAttribs w >> wRefresh w
     getCh >> return ()
 giveFeedback _ _ = return ()
@@ -290,7 +260,7 @@ giveFeedback _ _ = return ()
 drawBorder :: FileBrowser -> IO ()
 drawBorder browser = 
     let w = window browser
-    in wAttrSet w (folder, colorYellow) >> wBorder w defaultBorder >> wClearAttribs w
+    in wAttrSet w (folder, colorBorder) >> wBorder w defaultBorder >> wClearAttribs w
 
 clear :: Profiler -> IO ()
 clear (Profiler set _ _ _) = werase (window (active set)) >> werase (window (passive set))
@@ -310,7 +280,7 @@ displayBrowser browser = do
         cwd         = directory browser
         truncDir    = if (length cwd) < limit then cwd else drop ((length cwd) - limit) cwd
     wMove w (marginSize - 1) 1
-    wAttrSet w (folder, colorYellow) >> wAddStr w truncDir
+    wAttrSet w (folder, colorCWD) >> wAddStr w truncDir
     wClearAttribs w
     wMove w marginSize 0
     showFileList browser >> wRefresh w
@@ -351,8 +321,8 @@ showFileList browser =
                             file'   = trunc ++ (spaces (limit - (length trunc)))
                         wAttrSet w attrib >> mvWAddStr w (y+1) 1 file' >> wClearAttribs w
             getAttrib isSelected file = 
-                if isSelected then pure (selected, colorBlue)
-                else if (last file) == '/' then pure (folder, colorBlue)
+                if isSelected then pure (selected, colorSelected)
+                else if (last file) == '/' then pure (folder, colorFolder)
                 else (\e -> if e == Right True then (attr0, colorExec) else (attr0, (Pair 0))) <$> (isExecutable file)
 
 -- Generates string of spaces
@@ -382,28 +352,34 @@ initProfiler :: Dispatch -> IO()
 initProfiler dispatch = do
     initCurses
     colorsSupported <- colorPairs
-    if colorsSupported < 250 then initColors16 else initColors
     cursSet CursorInvisible
     echo False
-    w <- initScr
     installHandler (fromJust cursesSigWinch) (Catch resize) Nothing
-    wleft <- createLeftWindow
-    wRefresh wleft
-    wright <- createRightWindow
-    wRefresh wright
-    update
-    dir <- getCurrentDirectory
-    list <- sortDirectoryList <$> getDirectoryList dir
-    let leftPane    = FileBrowser {window=wleft, directory=dir, files=list, indexStack=[0]}
-        rightPane   = FileBrowser {window=wright, directory=dir, files=list, indexStack=[0]}
-        set         = WindowSet {active=leftPane, passive=rightPane, orientation=NormalOri}
-        profiler    = Profiler set Normal dispatch NoResults
-    displayBrowser leftPane >> displayBrowser rightPane
-    run profiler
+    if colorsSupported < 250 then initColors16 
+    else do
+        defaultColorFile <- (++ "/.profiler/colors") <$> getHomeDirectory
+        res <- colorConfig defaultColorFile
+        case res of
+            Left _ -> do
+                w <- initScr
+                wleft <- createLeftWindow
+                wRefresh wleft
+                wright <- createRightWindow
+                wRefresh wright
+                update
+                dir <- getCurrentDirectory
+                list <- sortDirectoryList <$> getDirectoryList dir
+                let leftPane    = FileBrowser {window=wleft, directory=dir, files=list, indexStack=[0]}
+                    rightPane   = FileBrowser {window=wright, directory=dir, files=list, indexStack=[0]}
+                    set         = WindowSet {active=leftPane, passive=rightPane, orientation=NormalOri}
+                    profiler    = Profiler set Normal dispatch NoResults
+                displayBrowser leftPane >> displayBrowser rightPane
+                run profiler
+            Right err -> putStrLn err
     endWin
 
 main = do
-    defaultFile <- (++ "/.profiler") <$> getHomeDirectory
+    defaultFile <- (++ "/.profiler/defaults") <$> getHomeDirectory
     exists <- doesFileExist defaultFile
     if exists then return ()
     else writeFile defaultFile ""

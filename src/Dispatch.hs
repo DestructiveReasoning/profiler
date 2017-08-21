@@ -60,7 +60,7 @@ defaultApps = [("pdf",["evince","firefox","mupdf"]),
 
 readConfig :: FilePath -> IO (Either Dispatch String)
 readConfig file =
-    (((parseLines defaultApps 1) . lines) <$> (readFile file))
+    (parseLines defaultApps 1) . lines <$> (readFile file)
 
 parseLines :: Dispatch -> Int -> [String] -> Either Dispatch String
 parseLines dispatch _ [] = Left dispatch
