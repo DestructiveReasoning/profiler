@@ -38,7 +38,7 @@ Default applications can be specified in the `~/.profiler/defaults` file, with t
 <file extension 3>, <program 3>
 ...
 ```
-For example, the following is a valid `~/.profiler` file:
+For example, the following is a valid `~/.profiler/defaults` file:
 ```
 pdf, evince
 mp4, vlc
@@ -48,7 +48,7 @@ xlsx, libreoffice
 ```
 Opening files with CLI/TUI programs, such as Vim, can be quite buggy when not done properly.<br>
 For such cases, it is recommended to open the file with your CLI/TUI program in *another* terminal emulator instance, as follows:<br>
-*~/.profiler*
+*~/.profiler/defaults*
 ```
 hs, xterm -e vim
 ```
