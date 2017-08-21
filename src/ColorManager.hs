@@ -10,6 +10,8 @@ import UI.HSCurses.CursesHelper
 
 data ColorSetting = ColorSetting Int Int Int
 
+data ErrorType = InvalidClass | BadFormat | BadColor | InvalidColor
+
 colorConfig :: FilePath -> IO (Either () String)
 colorConfig file = 
     doesFileExist file >>= (\b -> if b then parseColorConfig file else initColors >> pure (Left ()))
@@ -32,17 +34,17 @@ readColorConfig file =
         let w = words x
             p = getPair (w !! 0)
         in
-        if (length w) /= 3 then Right ("[Color Settings] Syntax error on line " ++ (show n) ++ ": \"" ++ x ++ "\"")
-        else if isNothing p then Right ("[Color Settings] Syntax error on line " ++ (show n) ++ ": Invalid color class - \"" ++ (w !! 0) ++ "\"")
+        if (length w) /= 3 then Right $ showSyntaxError BadFormat n x
+        else if isNothing p then Right $ showSyntaxError InvalidClass n (w !! 0)
         else
             let resf = readMaybe (w !! 1) :: Maybe Int
                 resb = readMaybe (w !! 2) :: Maybe Int
             in case (resf,resb) of
-                (Nothing,_) -> Right ("[Color Settings] Syntax error on line " ++ (show n) ++ ": Invalid color setting, must be an integer")
-                (_,Nothing) -> Right ("[Color Settings] Syntax error on line " ++ (show n) ++ ": Invalid color setting, must be an integer")
+                (Nothing,_) -> Right $ showSyntaxError BadColor n (w !! 1)
+                (_,Nothing) -> Right $ showSyntaxError BadColor n (w !! 2)
                 (Just f,Just b) -> 
                     if f > 255 || b > 255  || f < -1 || b < -1 then
-                        Right ("[Color Settings] Syntax error on line " ++ (show n) ++ ": Invalid color setting, must be between -1 and 355")
+                        Right $ showSyntaxError InvalidColor n x
                     else parseLines (cfg ++ [(ColorSetting (fromJust p) f b)]) (n+1) xs
 
 parseColorConfig :: FilePath -> IO (Either () String)
@@ -58,6 +60,17 @@ parseColorConfig file = do
             fg' = if fg == -1 then defaultForeground else Color fg
             bg' = if bg == -1 then defaultBackground else Color bg
         in initPair (Pair pair) fg' bg' >> (genColors xs)
+
+showSyntaxError :: ErrorType -> Int -> String -> String
+showSyntaxError t num err = 
+    let prefix = "[Color Settings] Syntax error on line " ++ (show num) ++ " - "
+    in
+    case t of
+        InvalidClass ->  prefix ++ "Invalid color class: \"" ++ err ++ "\"."
+        BadFormat -> 
+            prefix ++ "Invalid format. Color settings should contain 3 columns, but " ++ (show (length (words err))) ++ " are given."
+        BadColor -> prefix ++ "Invalid color setting: \"" ++ err ++ "\". Color must be an integer."
+        InvalidColor -> prefix ++ "Invalid color setting: \"" ++ err ++ "\". Color must be between -1 and 255."
 
 -- Legend 
 -- Pair 1:  selected color

@@ -375,8 +375,8 @@ initProfiler dispatch = do
                     profiler    = Profiler set Normal dispatch NoResults
                 displayBrowser leftPane >> displayBrowser rightPane
                 run profiler
-            Right err -> putStrLn err
-    endWin
+                endWin
+            Right err -> endWin >> putStrLn err
 
 main = do
     defaultFile <- (++ "/.profiler/defaults") <$> getHomeDirectory
