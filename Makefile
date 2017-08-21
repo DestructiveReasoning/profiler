@@ -3,7 +3,7 @@ bindir="bin/"
 srcdir="src/"
 configdir="config/"
 legacysrcdir=$(srcdir)Legacy/
-profilerdir=$(HOME)/.profiler
+profilerdir=~/.profiler
 
 Profiler: build clean
 
@@ -26,4 +26,4 @@ install: installconfig
 
 installconfig:
 	mkdir -p $(profilerdir)
-	cp -n $(configdir)* $(profilerdir)/
+	rsync -av --ignore-existing $(configdir) $(profilerdir)
