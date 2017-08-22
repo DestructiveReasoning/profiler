@@ -300,7 +300,7 @@ getDisplayListIndices browser = do
         threshold   = cap `div` 2
     if (len <= cap) then return $ ScrollIndex 0 len i
     else if (i < threshold) then return $ ScrollIndex 0 cap i
-    else if (i < len - threshold) then return $ ScrollIndex (i-threshold) (i+threshold) threshold
+    else if (i < len - threshold) then return $ ScrollIndex (i-threshold) (i+threshold+1) threshold
     else return $ ScrollIndex (len - cap) len (i + cap - len)
 
 showFileList :: FileBrowser -> IO ()
