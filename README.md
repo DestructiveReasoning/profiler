@@ -52,7 +52,6 @@ For such cases, it is recommended to open the file with your CLI/TUI program in 
 ```
 hs, xterm -e vim
 ```
-<br>
 When trying to open a file type whose extension is not included in the `~/.profiler/defaults` file, Profiler will fall back to `xdg-open`.
 
 ### Custom Colorscheme
