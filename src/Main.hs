@@ -119,8 +119,8 @@ handleInput (Profiler set Normal dispatch search) input =
         KeyChar 'H'     -> do 
             cap <- fileCapacity
             let (loc:rest)  = indexStack . active $ set
-                fileList    = files . active $ set
-                offset      = if (length fileList) - 1 - loc < cap `div` 2 then cap `div` 2 - ((length fileList) - 1 - loc) else 0
+                volume      = length . files . active $ set
+                offset      = if volume - 1 - loc < cap `div` 2 then cap `div` 2 - (volume - 1 - loc) else 0
                 firstguess  = loc - offset - cap `div` 2
                 index'      = if firstguess < 0 then 0 else firstguess
                 browser     = (active set){indexStack=(index':rest)}
@@ -128,10 +128,10 @@ handleInput (Profiler set Normal dispatch search) input =
         KeyChar 'L'     -> do
             cap <- fileCapacity
             let (loc:rest)  = indexStack . active $ set
-                fileList    = files . active $ set
+                volume      = files . active $ set
                 offset      = if loc < cap `div` 2 then cap `div` 2 - loc else 0
                 lastguess   = loc + offset + cap `div` 2
-                index'      = if lastguess >= (length fileList) then (length fileList) - 1 else lastguess
+                index'      = if lastguess >= volume then volume - 1 else lastguess
                 browser     = (active set){indexStack=(index':rest)}
             run $ Profiler set{active=browser} Normal dispatch search
         KeyChar 'o'     -> -- Open file with...
