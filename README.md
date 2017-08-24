@@ -30,7 +30,7 @@ Tab | Switch frames
 q | Quit Profiler
 
 Furthermore, the "j" and "k" inputs can be prepended with a number of files to go down/up by.<br>
-For example, typing "4j" in Normal mode will navigate 4 files downward.
+For example, typing "4j" in Normal mode will navigate 4 files downward.<br>
 *Profiler is still in development. More keybindings and features are coming.*
 
 Configuration
