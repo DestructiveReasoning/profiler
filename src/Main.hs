@@ -55,7 +55,7 @@ wClearAttribs window = wAttrSet window (attr0, Pair 0)
 
 run :: Profiler -> IO ()
 run profiler = 
-    refreshProfiler profiler >>= (\p -> clear p >> render p >> getCh >>= handleInput p)
+    refreshProfiler profiler >>= (\p -> clear p >> render p >> getCh >>= handleInput p 0)
 
 refreshProfiler :: Profiler -> IO Profiler
 refreshProfiler (Profiler set mode disp search) = do
@@ -89,21 +89,23 @@ switchPanes :: Profiler -> IO Profiler
 switchPanes (Profiler set Normal dispatch search) = 
     setCurrentDirectory (directory (passive set)) >> (pure $ reSearch $ Profiler (flipWindowSet set) Normal dispatch search)
 
-handleInput :: Profiler -> Key -> IO ()
-handleInput (Profiler set Normal dispatch search) input = 
+handleInput :: Profiler -> Int -> Key -> IO ()
+handleInput (Profiler set Normal dispatch search) reps input = 
     case input of
         KeyChar '\t'    -> -- Switch frames
             switchPanes (Profiler set Normal dispatch search) >>= run
         KeyChar 'j'     -> -- Move down
             let (loc:rest)  = indexStack . active $ set
                 fileList    = files . active $ set
-                index'      = if (loc + 1 >= length fileList) then loc else loc + 1
+                shift       = if reps == 0 then 1 else reps
+                index'      = if (loc + shift >= length fileList) then (length fileList) - 1 else loc + shift
                 browser     = (active set){indexStack=(index':rest)}
             in run $ Profiler set{active=browser} Normal dispatch search
         KeyChar 'k'     ->  -- Move up
             let (loc:rest)  = indexStack . active $ set
                 fileList    = files . active $ set
-                index'      = if (loc == 0) then loc else loc - 1
+                shift       = if reps == 0 then 1 else reps
+                index'      = if loc - shift < 0 then 0 else loc - shift
                 browser     = (active set){indexStack=(index':rest)}
             in run $ Profiler set{active=browser} Normal dispatch search
         KeyChar 'h'     -> -- Go up a directory
@@ -128,7 +130,7 @@ handleInput (Profiler set Normal dispatch search) input =
         KeyChar 'L'     -> do
             cap <- fileCapacity
             let (loc:rest)  = indexStack . active $ set
-                volume      = files . active $ set
+                volume      = length . files . active $ set
                 offset      = if loc < cap `div` 2 then cap `div` 2 - loc else 0
                 lastguess   = loc + offset + cap `div` 2
                 index'      = if lastguess >= volume then volume - 1 else lastguess
@@ -220,8 +222,11 @@ handleInput (Profiler set Normal dispatch search) input =
                 Left err -> giveFeedback ErrorMessage err >> run prof
                 _ -> reindexProfiler prof >>= run
         KeyChar 'q'     -> return ()
+        KeyChar x       ->
+            if x `elem` "0123456789" then getCh >>= handleInput (Profiler set Normal dispatch search) (10 * reps + (read [x]))
+            else run $ Profiler set Normal dispatch search
         _               -> run $ Profiler set Normal dispatch search
-handleInput (Profiler set Search dispatch (Found x ls)) input = 
+handleInput (Profiler set Search dispatch (Found x ls)) _ input = 
     case input of
         KeyChar '\n'    -> run $ Profiler set Normal dispatch (Found x ls)
         KeyChar '\b'    -> 
