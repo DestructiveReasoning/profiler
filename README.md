@@ -8,7 +8,7 @@ Using Profiler
 Upon launching Profiler, you will be put in **Normal Mode**. <br />
 The following keys are used for navigation in **Normal Mode**:
 Key | Action
---- | ------
+-------- | --------
 j,k | Move down/up
 h | Move up a directory
 l | If a directory is selected, navigate to that directory. Else execute the selected file.
