@@ -7,24 +7,24 @@ Using Profiler
 --------------
 Upon launching Profiler, you will be put in **Normal Mode**. <br />
 The following keys are used for navigation in **Normal Mode**:
-```
-j,k:  Move down/up
-h:    Move up a directory
-l:    If a directory is selected, navigate to that directory. Else execute the selected file.
-o:    Prompts for name of program to open the file with
-g:    Navigate to the first file in the directory
-G:    Navigate to the last file in the directory
-d:    Delete the selected file
-y:    Copy the selected file to a destination defined by an input prompt
-S:    Move the selected file to a destination defined by an input prompt
-a:    Create a directory (and its parents) defined by an input prompt
-^:    Navigate to the user's home directory
-/:    Search current directory
-n:    Next search result
-N:    Previous search result
-Tab:  Switch frames
-q:    Quit Profiler
-```
+Key | Action
+--- | ------
+j,k | Move down/up
+h | Move up a directory
+l | If a directory is selected, navigate to that directory. Else execute the selected file.
+o | Prompts for name of program to open the file with
+g | Navigate to the first file in the directory
+G | Navigate to the last file in the directory
+d | Delete the selected file
+y | Copy the selected file to a destination defined by an input prompt
+S | Move the selected file to a destination defined by an input prompt
+a | Create a directory (and its parents) defined by an input prompt
+^ | Navigate to the user's home directory
+/ | Search current directory
+n | Next search result
+N | Previous search result
+Tab | Switch frames
+q | Quit Profiler
 
 *Profiler is still in development. More keybindings and features are coming.*
 
