@@ -13,6 +13,8 @@ Key | Action
 j,k | Move down/up
 h | Move up a directory
 l | If a directory is selected, navigate to that directory. Else execute the selected file.
+H | Move to the file at the top of the page
+L | Move to the file at the bottom of the page
 o | Prompts for name of program to open the file with
 g | Navigate to the first file in the directory
 G | Navigate to the last file in the directory

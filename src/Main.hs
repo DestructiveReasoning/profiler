@@ -116,6 +116,24 @@ handleInput (Profiler set Normal dispatch search) input =
                     changeDir file (active set) >>= (\browser -> run $ reSearch (Profiler set{active=browser} Normal dispatch search))
                 else do
                     spawnFile file dispatch >> (run $ Profiler set Normal dispatch search)
+        KeyChar 'H'     -> do 
+            cap <- fileCapacity
+            let (loc:rest)  = indexStack . active $ set
+                fileList    = files . active $ set
+                offset      = if (length fileList) - 1 - loc < cap `div` 2 then cap `div` 2 - ((length fileList) - 1 - loc) else 0
+                firstguess  = loc - offset - cap `div` 2
+                index'      = if firstguess < 0 then 0 else firstguess
+                browser     = (active set){indexStack=(index':rest)}
+            run $ Profiler set{active=browser} Normal dispatch search
+        KeyChar 'L'     -> do
+            cap <- fileCapacity
+            let (loc:rest)  = indexStack . active $ set
+                fileList    = files . active $ set
+                offset      = if loc < cap `div` 2 then cap `div` 2 - loc else 0
+                lastguess   = loc + offset + cap `div` 2
+                index'      = if lastguess >= (length fileList) then (length fileList) - 1 else lastguess
+                browser     = (active set){indexStack=(index':rest)}
+            run $ Profiler set{active=browser} Normal dispatch search
         KeyChar 'o'     -> -- Open file with...
             let fileList    = files . active $ set
                 index       = head $ indexStack . active $ set
