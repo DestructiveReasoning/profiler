@@ -48,6 +48,8 @@ xlsx, libreoffice
 ```
 Opening files with CLI/TUI programs, such as Vim, can be quite buggy when not done properly.<br>
 For such cases, it is recommended to open the file with your CLI/TUI program in *another* terminal emulator instance, as follows:<br>
+<br>
+When trying to open a file type whose extension is not included in the `~/.profiler/defaults` file, Profiler will fall back to `xdg-open`.
 *~/.profiler/defaults*
 ```
 hs, xterm -e vim
