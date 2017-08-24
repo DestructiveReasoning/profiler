@@ -7,6 +7,7 @@ Using Profiler
 --------------
 Upon launching Profiler, you will be put in **Normal Mode**. <br />
 The following keys are used for navigation in **Normal Mode**:
+
 Key | Action
 -------- | --------
 j,k | Move down/up
