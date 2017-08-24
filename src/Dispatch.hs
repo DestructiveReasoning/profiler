@@ -25,8 +25,8 @@ openWith :: Maybe String -> FilePath -> Dispatch -> IO ()
 openWith prog file dispatch = 
     let file' = makeProperDirectory file
     in case prog of 
-        Nothing -> return ()
-        Just p -> createProcess (shell (p ++ " " ++ file')) { std_out = CreatePipe, std_err = CreatePipe, new_session = True } >> return ()
+        Nothing -> createProcess (shell ("xdg-open " ++ file' ++ " 1>/dev/null")) { std_err = CreatePipe, new_session = True } >> return ()
+        Just p  -> createProcess (shell (p ++ " " ++ file')) { std_out = CreatePipe, std_err = CreatePipe, new_session = True } >> return ()
 
 getLauncher :: FilePath -> Dispatch -> Maybe String
 getLauncher file dispatch = 
