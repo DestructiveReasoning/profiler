@@ -1,7 +1,7 @@
-builddir="build/"
-bindir="bin/"
-srcdir="src/"
-configdir="config/"
+builddir=build/
+bindir=bin/
+srcdir=src/
+configdir=config/
 legacysrcdir=$(srcdir)Legacy/
 profilerdir=~/.profiler
 

@@ -216,8 +216,7 @@ handleInput (Profiler set Normal dispatch search) reps input =
                     _ -> reindexProfiler prof >>= run
         KeyChar 'a'     -> do
             let prof = Profiler set Normal dispatch search
-            dir <- getInput "Make directory: " 
-            result <- mkdir dir (active set) 
+            result <- getInput "Make Directory: " >>= (mkdir (active set))
             case result of
                 Left err -> giveFeedback ErrorMessage err >> run prof
                 _ -> reindexProfiler prof >>= run

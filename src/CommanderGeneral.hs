@@ -150,8 +150,8 @@ copyTo destination op browser =
                 Left ex -> return (Left "Cannot copy/move file")
                 Right _ -> return (Right ())
 
-mkdir :: FilePath -> FileBrowser -> IO (Either String ())
-mkdir dir browser = setCurrentDirectory (directory browser) >> createDirectoryIfMissing' dir
+mkdir :: FileBrowser -> FilePath -> IO (Either String ())
+mkdir browser dir = setCurrentDirectory (directory browser) >> createDirectoryIfMissing' dir
     where createDirectoryIfMissing' a = do
             result <- try (createDirectoryIfMissing True a) :: IO (Either SomeException ())
             case result of
