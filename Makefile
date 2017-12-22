@@ -13,7 +13,7 @@ init:
 	mkdir -p $(profilerdir)
 
 build: init
-	ghc $(srcdir)Main.hs $(srcdir)CommanderGeneral.hs $(srcdir)Dispatch.hs $(srcdir)Interrogator.hs $(srcdir)ColorManager.hs -odir $(builddir) -hidir $(builddir) -o $(bindir)profiler
+	ghc -dynamic $(srcdir)Main.hs $(srcdir)CommanderGeneral.hs $(srcdir)Dispatch.hs $(srcdir)Interrogator.hs $(srcdir)ColorManager.hs -odir $(builddir) -hidir $(builddir) -o $(bindir)profiler
 
 legacy: init
 	ghc $(legacysrcdir)Main.hs $(legacysrcdir)CommanderGeneral.hs -odir $(builddir) -hidir $(builddir) -o $(bindir)profiler
